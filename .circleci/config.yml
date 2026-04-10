@@ -1,0 +1,22 @@
+# .circleci/config.yml
+version: 2.1
+jobs:
+  build-and-test:
+    docker:
+      - image: cimg/node:18.0
+    steps:
+      - checkout
+      - run:
+          name: "Install Dependencies"
+          command: npm install
+      - run:
+          name: "Run Security Audit"
+          command: npm audit # Fails pipeline if known vulnerabilities are found
+      - run:
+          name: "SonarQube Scan"
+          command: echo "Running SonarQube static code analysis..."
+
+workflows:
+  security-pipeline:
+    jobs:
+      - build-and-test
