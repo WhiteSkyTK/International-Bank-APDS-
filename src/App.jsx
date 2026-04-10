@@ -1,30 +1,42 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-// Import all pages
+// Auth Pages
 import { Login } from './pages/auth/Login';
 import { Register } from './pages/auth/Register';
 import { ForgotPassword } from './pages/auth/ForgotPassword';
 import { ForgotUsername } from './pages/auth/ForgotUsername';
 import { ForgotAccount } from './pages/auth/ForgotAccount';
-import { Dashboard } from './pages/dashboard/Dashboard';
+
+// Dashboard Pages
+import { Overview } from './pages/dashboard/Overview';
+import { MakePayment } from './pages/dashboard/MakePayment';
+import { Security } from './pages/dashboard/Security';
+import { Transactions } from './pages/dashboard/Transactions';
+import { Profile } from './pages/dashboard/Profile';
+import { Support } from './pages/dashboard/Support';
 
 export default function App() {
     return (
         <Router>
             <Routes>
-                {/* Auth Routes */}
+                {/* Auth */}
                 <Route path="/" element={<Login />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                
-                {/* Recovery Routes */}
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/forgot-username" element={<ForgotUsername />} />
                 <Route path="/forgot-account" element={<ForgotAccount />} />
                 
-                {/* Main App Routes */}
-                <Route path="/dashboard" element={<Dashboard />} />
+                {/* Internal App */}
+                <Route path="/dashboard" element={<Overview />} />
+                <Route path="/payment" element={<MakePayment />} />
+                <Route path="/security" element={<Security />} />
+                <Route path="/transactions" element={<Transactions />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/support" element={<Support />} />
+                
+                {/* Note: Create /transactions, /profile, /support pages later to finish the set! */}
             </Routes>
         </Router>
     );
