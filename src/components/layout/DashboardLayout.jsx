@@ -1,10 +1,20 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Bell, CreditCard, Send, History, User, MessageSquare, ShieldCheck, LogOut } from 'lucide-react';
 
 export const DashboardLayout = ({ children, title = "Dashboard Overview" }) => {
     const navigate = useNavigate();
     const location = useLocation();
+    const [user, setUser] = useState(null);
+
+    useEffect(() => {
+        const savedUser = JSON.parse(localStorage.getItem('user'));
+        if (savedUser) {
+            setUser(savedUser);
+        } else {
+            navigate('/login');
+        }
+    }, [navigate]);
 
     const NavItem = ({ icon, label, path, count }) => {
         const active = location.pathname === path;
@@ -16,17 +26,22 @@ export const DashboardLayout = ({ children, title = "Dashboard Overview" }) => {
         );
     };
 
+    if (!user) return null;
+
     return (
         <div className="flex h-screen bg-[#E5E7EB] font-sans">
             {/* Sidebar */}
             <div className="w-64 lg:w-72 bg-[#1C4382] text-white flex flex-col p-4 lg:p-6 shadow-xl z-20 hidden md:flex shrink-0">
                 <h1 className="text-2xl font-bold mb-8 tracking-tighter">GLOBALPAY</h1>
                 
+                {/* DYNAMIC SIDEBAR PROFILE */}
                 <div className="flex items-center gap-4 mb-8 bg-white/10 p-3 rounded-2xl">
-                    <div className="w-10 h-10 bg-white text-[#1C4382] rounded-full flex items-center justify-center font-bold text-lg shadow-lg">JS</div>
+                    <div className="w-10 h-10 bg-white text-[#1C4382] rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
+                        {user.fullName?.charAt(0) || "T"}
+                    </div>
                     <div>
-                        <p className="font-bold text-sm leading-none mb-1">John Smith</p>
-                        <p className="text-[10px] text-blue-200 opacity-70 uppercase tracking-wider">Personal Account</p>
+                        <p className="font-bold text-sm leading-none mb-1">{user.fullName}</p>
+                        <p className="text-[10px] text-blue-200 opacity-70 uppercase tracking-wider">Account Holder</p>
                     </div>
                 </div>
 
@@ -44,7 +59,7 @@ export const DashboardLayout = ({ children, title = "Dashboard Overview" }) => {
                     <NavItem icon={<ShieldCheck size={20}/>} label="Security" path="/security" />
                 </nav>
 
-                <button onClick={() => navigate('/login')} className="mt-auto flex items-center gap-3 p-4 rounded-2xl border border-white/20 hover:bg-red-500/20 hover:border-red-500/30 transition font-bold text-sm">
+                <button onClick={() => { localStorage.removeItem('user'); navigate('/login'); }} className="mt-auto flex items-center gap-3 p-4 rounded-2xl border border-white/20 hover:bg-red-500/20 transition font-bold text-sm">
                     <LogOut size={20} className="text-red-400" /> Sign Out
                 </button>
             </div>
@@ -54,12 +69,14 @@ export const DashboardLayout = ({ children, title = "Dashboard Overview" }) => {
                 <header className="bg-white p-6 shadow-sm flex justify-between items-center z-10 shrink-0">
                     <h2 className="text-xl lg:text-2xl font-bold text-gray-800">{title}</h2>
                     <div className="flex items-center gap-4 lg:gap-6">
-                        <div className="relative cursor-pointer hover:scale-110 transition"><Bell className="text-gray-400" /><div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></div></div>
-                        <p className="text-sm font-medium text-gray-500 hidden sm:block">25 Mar 2026 · 12:39</p>
+                        <div className="relative cursor-pointer hover:scale-110 transition">
+                            <Bell className="text-gray-400" />
+                            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></div>
+                        </div>
+                        <p className="text-sm font-medium text-gray-500 hidden sm:block">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     </div>
                 </header>
                 
-                {/* Page Content Injected Here */}
                 <main className="flex-grow p-6 lg:p-10 overflow-y-auto">
                     {children}
                 </main>

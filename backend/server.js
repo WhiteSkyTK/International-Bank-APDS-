@@ -25,7 +25,12 @@ const loginLimiter = rateLimit({
 const userSchema = new mongoose.Schema({
     fullName: { type: String, required: true },
     idNumber: { type: String, required: true, unique: true },
-    accountNumber: { type: String, required: true, unique: true },
+    // Account number is now auto-generated if missing
+    accountNumber: { 
+        type: String, 
+        unique: true,
+        default: () => "8818" + Math.floor(100000 + Math.random() * 900000) 
+    },
     password: { type: String, required: true },
     balance: { type: Number, default: 50000.00 }
 });
@@ -48,13 +53,12 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Securely connected to MongoDB Atlas"))
   .catch(err => console.error("Database connection error:", err));
 
-// --- 4. REGEX PATTERNS (Whitelisting) ---
+// --- 4. REGEX PATTERNS ---
 const regexPatterns = {
     name: /^[a-zA-Z\s]{2,50}$/,
     accountNumber: /^\d{8,12}$/,
     idNumber: /^\d{13}$/,
-    password: /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/,
-    swift: /^[A-Z0-9]{8,11}$/
+    password: /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/
 };
 
 // --- 5. ROUTES ---
@@ -63,8 +67,7 @@ const regexPatterns = {
 app.post('/api/register', async (req, res) => {
     const { fullName, idNumber, accountNumber, password } = req.body;
 
-    if (!regexPatterns.name.test(fullName) || !regexPatterns.idNumber.test(idNumber) || 
-        !regexPatterns.accountNumber.test(accountNumber) || !regexPatterns.password.test(password)) {
+    if (!regexPatterns.name.test(fullName) || !regexPatterns.idNumber.test(idNumber) || !regexPatterns.password.test(password)) {
         return res.status(400).json({ error: "Invalid input format detected." });
     }
 
@@ -72,9 +75,16 @@ app.post('/api/register', async (req, res) => {
         const salt = await bcrypt.genSalt(12);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const newUser = new User({ fullName, idNumber, accountNumber, password: hashedPassword });
+        // If accountNumber is empty string from frontend, the default function in schema kicks in
+        const newUser = new User({ 
+            fullName, 
+            idNumber, 
+            accountNumber: accountNumber || undefined, 
+            password: hashedPassword 
+        });
+        
         await newUser.save();
-        res.status(201).json({ message: "Registration successful!" });
+        res.status(201).json({ message: "Registration successful!", accountNumber: newUser.accountNumber });
     } catch (err) {
         res.status(500).json({ error: "User already exists or server error." });
     }
@@ -93,14 +103,19 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
         res.json({ 
             message: "Login successful", 
-            user: { id: user._id, fullName: user.fullName, balance: user.balance } 
+            user: { 
+                id: user._id, 
+                fullName: user.fullName, 
+                balance: user.balance,
+                accountNumber: user.accountNumber 
+            } 
         });
     } catch (err) {
         res.status(500).json({ error: "Server error during login." });
     }
 });
 
-// MAKE PAYMENT
+// MAKE PAYMENT (Updates Balance & Saves to Statement)
 app.post('/api/pay', async (req, res) => {
     const { userId, amount, payeeName, payeeAccount, swiftCode } = req.body;
 
@@ -110,15 +125,31 @@ app.post('/api/pay', async (req, res) => {
             return res.status(400).json({ error: "Insufficient funds or invalid user." });
         }
 
-        user.balance -= amount;
+        // 1. Deduct from balance
+        user.balance -= parseFloat(amount);
         await user.save();
 
+        // 2. Create the "Statement" entry
         const payment = new Payment({ userId, amount, payeeName, payeeAccount, swiftCode });
         await payment.save();
 
-        res.status(201).json({ message: "Payment submitted for verification", newBalance: user.balance });
+        res.status(201).json({ 
+            message: "Payment successful", 
+            newBalance: user.balance,
+            transactionId: payment._id 
+        });
     } catch (err) {
         res.status(500).json({ error: "Payment processing failed." });
+    }
+});
+
+// GET TRANSACTIONS (For the Statement page)
+app.get('/api/transactions/:userId', async (req, res) => {
+    try {
+        const history = await Payment.find({ userId: req.params.userId }).sort({ createdAt: -1 });
+        res.json(history);
+    } catch (err) {
+        res.status(500).json({ error: "Could not fetch transaction history." });
     }
 });
 
