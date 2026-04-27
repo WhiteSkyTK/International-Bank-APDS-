@@ -23,10 +23,8 @@ export const Login = () => {
             const data = await response.json();
 
             if (response.ok) {
-                // Securely store the handshake data
-                localStorage.setItem('userId', data.user.id);
-                localStorage.setItem('userName', data.user.fullName);
-                localStorage.setItem('userBalance', data.user.balance);
+               localStorage.setItem('user', JSON.stringify(data.user));
+               alert("Login Successful!");
                 navigate('/dashboard');
             } else {
                 setError(data.error || "Login failed");
