@@ -6,14 +6,17 @@ export const DashboardLayout = ({ children, title = "Dashboard Overview" }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const [user, setUser] = useState(null);
+    const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
+        
         const savedUser = JSON.parse(localStorage.getItem('user'));
         if (savedUser) {
             setUser(savedUser);
         } else {
             navigate('/login');
         }
+        
     }, [navigate]);
 
     const NavItem = ({ icon, label, path, count }) => {
