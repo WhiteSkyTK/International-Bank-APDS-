@@ -1,4 +1,3 @@
-// backend/server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -9,8 +8,7 @@ const https = require('https');
 const fs = require('fs');
 const mongoose = require('mongoose');
 
-
-const app = express(); // MUST be initialized before routes
+const app = express();
 
 // --- 1. MIDDLEWARE & SECURITY ---
 app.use(helmet()); 
@@ -29,7 +27,7 @@ const userSchema = new mongoose.Schema({
     idNumber: { type: String, required: true, unique: true },
     accountNumber: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    balance: { type: Number, default: 50000.00 } // Initial balance for new users
+    balance: { type: Number, default: 50000.00 }
 });
 
 const paymentSchema = new mongoose.Schema({
@@ -50,7 +48,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Securely connected to MongoDB Atlas"))
   .catch(err => console.error("Database connection error:", err));
 
-// --- 4. REGEX PATTERNS ---
+// --- 4. REGEX PATTERNS (Whitelisting) ---
 const regexPatterns = {
     name: /^[a-zA-Z\s]{2,50}$/,
     accountNumber: /^\d{8,12}$/,
@@ -93,7 +91,6 @@ app.post('/api/login', loginLimiter, async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(401).json({ error: "Invalid credentials." });
 
-        // For Task 2, return user info. (Task 3 will involve JWT Tokens)
         res.json({ 
             message: "Login successful", 
             user: { id: user._id, fullName: user.fullName, balance: user.balance } 
@@ -113,11 +110,9 @@ app.post('/api/pay', async (req, res) => {
             return res.status(400).json({ error: "Insufficient funds or invalid user." });
         }
 
-        // Deduct balance
         user.balance -= amount;
         await user.save();
 
-        // Create transaction record for Employee Review (Task 3)
         const payment = new Payment({ userId, amount, payeeName, payeeAccount, swiftCode });
         await payment.save();
 

@@ -1,24 +1,47 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../../components/layout/AuthLayout';
 import { InputField } from '../../components/common/InputField';
+import { SecurityPatterns } from '../../utils/security';
 
 export const ForgotAccount = () => {
     const navigate = useNavigate();
-    const handleRecovery = (e) => { e.preventDefault(); alert("Account number recovery initiated!"); navigate('/login'); };
+    const [formData, setFormData] = useState({ idNumber: '', email: '' });
+    const [msg, setMsg] = useState('');
+
+    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+    const handleRecovery = (e) => { 
+        e.preventDefault(); 
+        
+        if (!SecurityPatterns.idNumber.test(formData.idNumber)) {
+            return setMsg("Invalid ID format.");
+        }
+        
+        setMsg("Account recovery details sent to your registered email.");
+        setTimeout(() => navigate('/login'), 3000);
+    };
     
     return (
         <AuthLayout type="login">
-            <h2 className="text-3xl lg:text-4xl font-bold text-[#4A80D4] mb-1 tracking-tight">Forgot Your Account Number 😭</h2>
-            <p className="text-gray-500 mb-8 text-sm font-medium">Please enter your details</p>
+            <h2 className="text-3xl lg:text-4xl font-bold text-[#4A80D4] mb-1 tracking-tight">Forgot Account? 🏦</h2>
+            <p className="text-gray-500 mb-8 text-sm font-medium">Please enter your ID to recover your account</p>
             
-            <form onSubmit={handleRecovery} className="flex flex-col">
-                <InputField label="ID Number" defaultValue="0012176101083" />
-                <InputField label="Email Address" type="email" defaultValue="jsmith@email.com" />
+            {msg && <p className="text-green-600 text-xs font-bold mb-4 p-2 bg-green-50 rounded border border-green-200">{msg}</p>}
+
+            <form onSubmit={handleRecovery} className="flex flex-col space-y-4">
+                <InputField 
+                    label="ID Number" name="idNumber" 
+                    value={formData.idNumber} onChange={handleChange} 
+                />
+                <InputField 
+                    label="Email Address" type="email" name="email" 
+                    value={formData.email} onChange={handleChange} 
+                />
                 
                 <div className="flex flex-col items-end gap-1 text-[13px] text-[#4A80D4] font-medium mb-6 mt-2">
                     <button type="button" onClick={() => navigate('/login')} className="hover:text-[#3A68B0] transition opacity-70">
-                        Have an Account?
+                        Have an Account? Login
                     </button>
                 </div>
                 
