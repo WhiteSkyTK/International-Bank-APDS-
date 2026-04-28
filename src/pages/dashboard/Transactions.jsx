@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
+import { secureFetch } from '../../utils/secureFetch'; // Added secureFetch import
 import { ArrowUpRight, Loader2 } from 'lucide-react';
 
 export const Transactions = () => {
@@ -11,28 +12,23 @@ export const Transactions = () => {
 
     useEffect(() => {
         const fetchHistory = async () => {
-            const user  = JSON.parse(localStorage.getItem('user'));
-            const token = localStorage.getItem('token');
+            const userRaw = localStorage.getItem('user');
+            const user = userRaw ? JSON.parse(userRaw) : null;
 
-            if (!user || !token) {
+            if (!user?.id) {
                 navigate('/login');
                 return;
             }
 
             try {
-                const res = await fetch(`https://localhost:5000/api/transactions/${user.id}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`
-                    }
+                // Using your secureFetch wrapper here
+                const data = await secureFetch(`https://localhost:5000/api/transactions/${user.id}`, {
+                    method: 'GET'
                 });
 
-                if (!res.ok) {
-                    const data = await res.json();
-                    throw new Error(data.error || 'Failed to load transactions.');
-                }
+                // secureFetch handles 401/403 auto-logouts, so if it returns null/undefined, we stop
+                if (!data) return; 
 
-                const data = await res.json();
                 setHistory(data);
             } catch (err) {
                 setError(err.message || 'Could not reach the server.');
@@ -82,39 +78,46 @@ export const Transactions = () => {
                     </div>
                 )}
 
-                {!loading && history.map((tx) => (
-                    <div
-                        key={tx._id}
-                        className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition"
-                    >
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-50 text-[#4A80D4] rounded-2xl flex items-center justify-center font-bold shadow-sm">
-                                <ArrowUpRight size={20} />
-                            </div>
-                            <div>
-                                <p className="font-bold text-gray-800">{tx.payeeName}</p>
-                                <p className="text-xs text-gray-400 font-medium mt-0.5">
-                                    {new Date(tx.createdAt).toLocaleString('en-ZA', {
-                                        day: 'numeric', month: 'short', year: 'numeric',
-                                        hour: '2-digit', minute: '2-digit'
-                                    })}
-                                </p>
-                                <p className="text-[10px] text-gray-400 font-mono mt-0.5 uppercase tracking-wider">
-                                    SWIFT · {tx.swiftCode}
-                                </p>
-                            </div>
-                        </div>
+                {/* Updated mapping logic for the transaction list */}
+                {!loading && !error && history.length > 0 && (
+                    <div className="space-y-3">
+                        {history.map((tx) => (
+                            <div
+                                key={tx._id}
+                                className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-blue-50 text-[#4A80D4] rounded-2xl flex items-center justify-center font-bold shadow-sm">
+                                        <ArrowUpRight size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-gray-800">{tx.payeeName || tx.description || 'Transfer'}</p>
+                                        <p className="text-xs text-gray-400 font-medium mt-0.5">
+                                            {new Date(tx.createdAt || tx.date).toLocaleString('en-ZA', {
+                                                day: 'numeric', month: 'short', year: 'numeric',
+                                                hour: '2-digit', minute: '2-digit'
+                                            })}
+                                        </p>
+                                        {tx.swiftCode && (
+                                            <p className="text-[10px] text-gray-400 font-mono mt-0.5 uppercase tracking-wider">
+                                                SWIFT · {tx.swiftCode}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
 
-                        <div className="text-right flex flex-col items-end gap-1.5">
-                            <p className="font-bold text-lg text-red-500">
-                                -{tx.currency || 'R'} {Number(tx.amount).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-                            </p>
-                            <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full ${statusColor(tx.status)}`}>
-                                {tx.status}
-                            </span>
-                        </div>
+                                <div className="text-right flex flex-col items-end gap-1.5">
+                                    <p className={`font-bold text-lg ${tx.type === 'credit' ? 'text-green-600' : 'text-red-500'}`}>
+                                        {tx.type === 'credit' ? '+' : '-'}{tx.currency || 'R'} {Number(tx.amount).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                                    </p>
+                                    <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full ${statusColor(tx.status)}`}>
+                                        {tx.status}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                ))}
+                )}
             </div>
         </DashboardLayout>
     );
