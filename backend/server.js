@@ -314,7 +314,7 @@ app.patch('/api/payments/:id/verify', verifyPaymentLimiter, authenticate, employ
 // ─────────────────────────────────────────────
 
 // Get notifications for a user (newest first)
-app.get('/api/notifications/:userId', authenticate, async (req, res) => {
+app.get('/api/notifications/:userId', notificationMutationLimiter, authenticate, async (req, res) => {
     if (req.user.id.toString() !== req.params.userId)
         return res.status(403).json({ error: 'Unauthorised.' });
     try {
