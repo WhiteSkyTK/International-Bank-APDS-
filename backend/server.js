@@ -305,8 +305,15 @@ app.get('/api/notifications/:userId', authenticate, async (req, res) => {
     }
 });
 
+// Rate limit notification mutation endpoints
+const notificationMutationLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 120,
+    message: { error: 'Too many notification requests, please try again later.' }
+});
+
 // Mark all read
-app.patch('/api/notifications/:userId/read-all', authenticate, async (req, res) => {
+app.patch('/api/notifications/:userId/read-all', notificationMutationLimiter, authenticate, async (req, res) => {
     if (req.user.id.toString() !== req.params.userId)
         return res.status(403).json({ error: 'Unauthorised.' });
     try {
@@ -318,7 +325,7 @@ app.patch('/api/notifications/:userId/read-all', authenticate, async (req, res) 
 });
 
 // Dismiss (delete) a single notification
-app.delete('/api/notifications/:id', authenticate, async (req, res) => {
+app.delete('/api/notifications/:id', notificationMutationLimiter, authenticate, async (req, res) => {
     try {
         const notif = await Notification.findById(req.params.id);
         if (!notif) return res.status(404).json({ error: 'Not found.' });
