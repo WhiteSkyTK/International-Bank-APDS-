@@ -203,7 +203,15 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 // ─────────────────────────────────────────────
 // 9. PAYMENT ROUTES
 // ─────────────────────────────────────────────
-app.post('/api/pay', authenticate, async (req, res) => {
+const paymentLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 30,                  // max 30 payment attempts per window per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many payment requests. Please try again later.' }
+});
+
+app.post('/api/pay', paymentLimiter, authenticate, async (req, res) => {
     // IDOR check: token user must match the request userId
     if (req.user.id.toString() !== req.body.userId?.toString())
         return res.status(403).json({ error: 'Unauthorised payment attempt.' });
