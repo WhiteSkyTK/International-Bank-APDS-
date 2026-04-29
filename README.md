@@ -303,6 +303,14 @@ The video covers:
 |---|---|
 | **Student Number** | ST10296818 |
 | **Student Name** | Tokollo Will Nonyane |
+| **Student Number** | ST1039372 |
+| **Student Name** | Ramakuela Phathutshedzo |
+| **Student Number** | ST10367584 |
+| **Student Name** | Gundo Mathantshani|
+| **Student Number** | ST10538419 |
+| **Student Name** | Christian Bulabula  |
+| **Student Number** | ST10387834 |
+| **Student Name** | Neo Mthokozisi Yende |
 | **Module** | APDS7311 |
 | **Task** | Part 2 — Customer Portal |
 | **Institution** | The IIE |
