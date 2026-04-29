@@ -2,8 +2,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const INACTIVE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes total
-const WARNING_BEFORE_MS   =  2 * 60 * 1000; // warn at 13 min (2 min before logout)
+const INACTIVE_TIMEOUT_MS = 90 * 1000; // 90 seconds total
+const WARNING_BEFORE_MS   = 30 * 1000; // warn at 60s (30s before logout)
 
 export const useInactivityLogout = () => {
     const navigate     = useNavigate();
@@ -11,7 +11,7 @@ export const useInactivityLogout = () => {
     const warnRef      = useRef(null);
     const countdownRef = useRef(null);
     const [showWarning, setShowWarning] = useState(false);
-    const [secondsLeft, setSecondsLeft] = useState(120);
+    const [secondsLeft, setSecondsLeft] = useState(30);
 
     const logout = useCallback(() => {
         clearTimeout(timerRef.current);
@@ -28,16 +28,18 @@ export const useInactivityLogout = () => {
         clearTimeout(warnRef.current);
         clearInterval(countdownRef.current);
 
-        // Show warning banner 2 min before logout
+        // Show warning 30s before logout
         warnRef.current = setTimeout(() => {
             setShowWarning(true);
-            setSecondsLeft(120);
+            setSecondsLeft(30);
             countdownRef.current = setInterval(() => {
-                setSecondsLeft((s) => (s <= 1 ? (clearInterval(countdownRef.current), 0) : s - 1));
+                setSecondsLeft((s) => {
+                    if (s <= 1) { clearInterval(countdownRef.current); return 0; }
+                    return s - 1;
+                });
             }, 1000);
         }, INACTIVE_TIMEOUT_MS - WARNING_BEFORE_MS);
 
-        // Hard logout after full timeout
         timerRef.current = setTimeout(logout, INACTIVE_TIMEOUT_MS);
     }, [logout]);
 
