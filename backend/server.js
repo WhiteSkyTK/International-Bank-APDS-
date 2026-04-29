@@ -313,6 +313,13 @@ app.patch('/api/payments/:id/verify', verifyPaymentLimiter, authenticate, employ
 // 10. NOTIFICATION ROUTES
 // ─────────────────────────────────────────────
 
+// Rate limit notification mutation endpoints MUST BE DECLARED FIRST
+const notificationMutationLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 120,
+    message: { error: 'Too many notification requests, please try again later.' }
+});
+
 // Get notifications for a user (newest first)
 app.get('/api/notifications/:userId', notificationMutationLimiter, authenticate, async (req, res) => {
     if (req.user.id.toString() !== req.params.userId)
@@ -325,13 +332,6 @@ app.get('/api/notifications/:userId', notificationMutationLimiter, authenticate,
     } catch {
         res.status(500).json({ error: 'Could not fetch notifications.' });
     }
-});
-
-// Rate limit notification mutation endpoints
-const notificationMutationLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 120,
-    message: { error: 'Too many notification requests, please try again later.' }
 });
 
 // Mark all read
