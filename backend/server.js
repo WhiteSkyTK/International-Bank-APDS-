@@ -96,6 +96,14 @@ const authenticate = (req, res, next) => {
     });
 };
 
+const deleteNotificationLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many delete requests. Please try again later.' }
+});
+
 const employeeOnly = (req, res, next) => {
     if (req.user?.role !== 'employee')
         return res.status(403).json({ error: 'Access restricted to bank employees.' });
@@ -326,7 +334,7 @@ app.patch('/api/notifications/:userId/read-all', authenticate, async (req, res) 
 });
 
 // Dismiss (delete) a single notification
-app.delete('/api/notifications/:id', authenticate, async (req, res) => {
+app.delete('/api/notifications/:id', deleteNotificationLimiter, authenticate, async (req, res) => {
     try {
         const notif = await Notification.findById(req.params.id);
         if (!notif) return res.status(404).json({ error: 'Not found.' });
