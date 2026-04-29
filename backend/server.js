@@ -96,6 +96,14 @@ const authenticate = (req, res, next) => {
     });
 };
 
+const deleteNotificationLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many delete requests. Please try again later.' }
+});
+
 const employeeOnly = (req, res, next) => {
     if (req.user?.role !== 'employee')
         return res.status(403).json({ error: 'Access restricted to bank employees.' });
@@ -203,7 +211,15 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 // ─────────────────────────────────────────────
 // 9. PAYMENT ROUTES
 // ─────────────────────────────────────────────
-app.post('/api/pay', authenticate, async (req, res) => {
+const paymentLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 30,                  // max 30 payment attempts per window per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many payment requests. Please try again later.' }
+});
+
+app.post('/api/pay', paymentLimiter, authenticate, async (req, res) => {
     // IDOR check: token user must match the request userId
     if (req.user.id.toString() !== req.body.userId?.toString())
         return res.status(403).json({ error: 'Unauthorised payment attempt.' });
@@ -325,7 +341,7 @@ app.patch('/api/notifications/:userId/read-all', notificationMutationLimiter, au
 });
 
 // Dismiss (delete) a single notification
-app.delete('/api/notifications/:id', notificationMutationLimiter, authenticate, async (req, res) => {
+app.delete('/api/notifications/:id', deleteNotificationLimiter, authenticate, async (req, res) => {
     try {
         const notif = await Notification.findById(req.params.id);
         if (!notif) return res.status(404).json({ error: 'Not found.' });
