@@ -360,34 +360,20 @@ app.delete('/api/notifications/:id', deleteNotificationLimiter, authenticate, as
     }
 });
 
-// ─────────────────────────────────────────────
-// 11. HTTPS SERVER
-// ─────────────────────────────────────────────
-const sslOptions = {
-    key:  fs.readFileSync('./certs/server.key'),
-    cert: fs.readFileSync('./certs/server.cert')
-};
-
-https.createServer(sslOptions, app).listen(5000, () => {
-    console.log('🔒 Secure API running on https://localhost:5000');
-});
-
 // ─────────────────────────────────────────────────────────────
-// ADD THIS HEALTH ENDPOINT before the https.createServer block:
+// HEALTH ENDPOINT
 // ─────────────────────────────────────────────────────────────
-
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // ─────────────────────────────────────────────────────────────
-// REPLACE your existing https.createServer(...).listen block
-// with this — it allows Jest to import the app without HTTPS:
+// SERVER STARTUP (Fixed Logic)
 // ─────────────────────────────────────────────────────────────
-
 if (process.env.NODE_ENV === 'test') {
     module.exports = app;
 } else {
+    // Only declare and listen once, inside the else block
     const sslOptions = {
         key:  fs.readFileSync('./certs/server.key'),
         cert: fs.readFileSync('./certs/server.cert')
