@@ -285,7 +285,13 @@ app.get('/api/all-payments', authenticate, employeeOnly, async (req, res) => {
 });
 
 // Employee — verify payment
-app.patch('/api/payments/:id/verify', authenticate, employeeOnly, async (req, res) => {
+const verifyPaymentLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 60,
+    message: { error: 'Too many verification requests, please try again later.' }
+});
+
+app.patch('/api/payments/:id/verify', verifyPaymentLimiter, authenticate, employeeOnly, async (req, res) => {
     try {
         const payment = await Payment.findByIdAndUpdate(req.params.id, { status: 'Verified' }, { new: true });
         if (!payment) return res.status(404).json({ error: 'Payment not found.' });
