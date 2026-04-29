@@ -342,3 +342,28 @@ const sslOptions = {
 https.createServer(sslOptions, app).listen(5000, () => {
     console.log('🔒 Secure API running on https://localhost:5000');
 });
+
+// ─────────────────────────────────────────────────────────────
+// ADD THIS HEALTH ENDPOINT before the https.createServer block:
+// ─────────────────────────────────────────────────────────────
+
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ─────────────────────────────────────────────────────────────
+// REPLACE your existing https.createServer(...).listen block
+// with this — it allows Jest to import the app without HTTPS:
+// ─────────────────────────────────────────────────────────────
+
+if (process.env.NODE_ENV === 'test') {
+    module.exports = app;
+} else {
+    const sslOptions = {
+        key:  fs.readFileSync('./certs/server.key'),
+        cert: fs.readFileSync('./certs/server.cert')
+    };
+    https.createServer(sslOptions, app).listen(5000, () => {
+        console.log('🔒 Secure API running on https://localhost:5000');
+    });
+}
