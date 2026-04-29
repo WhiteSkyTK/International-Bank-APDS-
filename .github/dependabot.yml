@@ -1,0 +1,33 @@
+# .github/dependabot.yml
+# Tells GitHub to automatically check your dependencies for security updates.
+# GitHub will open pull requests automatically when a vulnerability is found.
+# This is completely free and needs zero setup beyond this file.
+
+version: 2
+
+updates:
+  # Frontend (React) dependencies
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - security
+      - dependencies
+
+  # Backend (Node/Express) dependencies
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - security
+      - dependencies
+
+  # GitHub Actions themselves
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
