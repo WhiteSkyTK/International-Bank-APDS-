@@ -1,50 +1,139 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
+import { ArrowUpRight, Loader2, RefreshCw } from 'lucide-react';
+import { secureFetch } from '../../utils/secureFetch';
 
 export const Transactions = () => {
-    // Mock Data based on your Figma screenshot
-    const txns = [
-        { name: "Jane Doe - Deutsche Bank", desc: "International SWIFT", date: "24 Mar 2026", amount: "-R 5,000", status: "Pending", code: "DEUTDEDB", out: true },
-        { name: "Salary — Employer Ltd", desc: "Direct Deposit", date: "20 Mar 2026", amount: "+R 35,000", status: "Complete", out: false },
-        { name: "Barclays UK", desc: "International SWIFT", date: "18 Mar 2026", amount: "-R 5,000", status: "Verified", code: "BARCGB22", out: true },
-        { name: "Commonwealth AU", desc: "International SWIFT", date: "14 Mar 2026", amount: "-R 5,000", status: "Verified", code: "CTBAAU2S", out: true },
-        { name: "Transfer In", desc: "Local Transfer", date: "10 Mar 2026", amount: "+R 10,000", status: "Complete", out: false }
-    ];
+    const navigate = useNavigate();
+    const [history, setHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error,   setError]   = useState('');
 
-    const getStatusColor = (status) => {
-        if (status === 'Pending') return 'bg-orange-100 text-orange-600';
-        if (status === 'Verified') return 'bg-green-100 text-green-700';
-        return 'bg-emerald-100 text-emerald-700';
+    const user = JSON.parse(localStorage.getItem('user'));
+
+    const fetchHistory = async () => {
+        if (!user?.id) { navigate('/login'); return; }
+        setLoading(true);
+        setError('');
+        try {
+            const res = await secureFetch(`https://localhost:5000/api/transactions/${user.id}`);
+            if (!res) return; // secureFetch handled 401 redirect
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to load transactions.');
+            }
+            const data = await res.json();
+            setHistory(data);
+        } catch (err) {
+            setError(err.message || 'Could not reach the server.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchHistory(); }, []);
+
+    const statusStyle = (status) => {
+        switch (status?.toLowerCase()) {
+            case 'verified':  return 'bg-green-100 text-green-700';
+            case 'rejected':  return 'bg-red-100   text-red-600';
+            default:          return 'bg-orange-100 text-orange-600';
+        }
     };
 
     return (
         <DashboardLayout title="Transaction History">
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                <div className="space-y-4">
-                    {txns.map((t, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition border-b border-gray-50 last:border-0">
-                            <div className="flex items-center gap-4">
-                                {/* Icon */}
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ${t.out ? 'bg-red-50' : 'bg-green-50'}`}>
-                                    <span className="text-xl">{t.out ? '📤' : '📥'}</span>
-                                </div>
-                                {/* Details */}
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <p className="font-bold text-gray-800 text-base">{t.name}</p>
-                                        {t.code && <span className="bg-blue-50 text-[#4A80D4] text-[10px] font-bold px-2 py-0.5 rounded-full">{t.code}</span>}
-                                    </div>
-                                    <p className="text-xs text-gray-400 font-medium">{t.date} · {t.desc}</p>
-                                </div>
+            <div className="max-w-4xl space-y-4">
+
+                {/* Header row */}
+                <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-500 font-medium">
+                        {!loading && !error && `${history.length} transaction${history.length !== 1 ? 's' : ''} found`}
+                    </p>
+                    <button
+                        onClick={fetchHistory}
+                        className="flex items-center gap-2 text-xs font-bold text-[#4A80D4] hover:underline"
+                    >
+                        <RefreshCw size={13} /> Refresh
+                    </button>
+                </div>
+
+                {/* Loading */}
+                {loading && (
+                    <div className="flex items-center justify-center py-20 text-gray-400 gap-3">
+                        <Loader2 size={24} className="animate-spin" />
+                        <span className="text-sm font-medium">Loading transactions…</span>
+                    </div>
+                )}
+
+                {/* Error */}
+                {!loading && error && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-sm font-semibold p-5 rounded-2xl">
+                        <p>{error}</p>
+                        <button onClick={fetchHistory} className="mt-2 text-xs underline">
+                            Try again
+                        </button>
+                    </div>
+                )}
+
+                {/* Empty state */}
+                {!loading && !error && history.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
+                        <span className="text-5xl">📭</span>
+                        <p className="font-semibold text-sm">No transactions yet.</p>
+                        <button
+                            onClick={() => navigate('/payment')}
+                            className="mt-2 bg-[#4A80D4] text-white text-xs font-bold px-6 py-2.5 rounded-full hover:bg-[#3A68B0] transition"
+                        >
+                            Make your first payment
+                        </button>
+                    </div>
+                )}
+
+                {/* Transaction list */}
+                {!loading && !error && history.map((tx) => (
+                    <div
+                        key={tx._id}
+                        className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition"
+                    >
+                        {/* Left */}
+                        <div className="flex items-start sm:items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-50 text-[#4A80D4] rounded-2xl flex items-center justify-center shrink-0 shadow-sm">
+                                <ArrowUpRight size={20} />
                             </div>
-                            {/* Amount & Status */}
-                            <div className="text-right">
-                                <p className={`font-bold text-lg ${t.out ? 'text-red-500' : 'text-green-500'}`}>{t.amount}</p>
-                                <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${getStatusColor(t.status)}`}>{t.status}</span>
+                            <div className="space-y-0.5">
+                                <p className="font-bold text-gray-800">{tx.payeeName}</p>
+                                <p className="text-xs text-gray-500 font-mono">
+                                    To: {tx.payeeAccount}
+                                </p>
+                                <div className="flex items-center gap-2 flex-wrap mt-1">
+                                    <span className="bg-blue-50 text-[#4A80D4] text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">
+                                        {tx.swiftCode}
+                                    </span>
+                                    <span className="text-[10px] text-gray-400">
+                                        {new Date(tx.createdAt).toLocaleString('en-ZA', {
+                                            day: 'numeric', month: 'short', year: 'numeric',
+                                            hour: '2-digit', minute: '2-digit'
+                                        })}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    ))}
-                </div>
+
+                        {/* Right */}
+                        <div className="text-right flex flex-col items-end gap-1.5 shrink-0">
+                            <p className="font-bold text-lg text-red-500">
+                                -{tx.currency || 'R'}{' '}
+                                {Number(tx.amount).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                            </p>
+                            <span className={`text-[10px] uppercase font-bold px-3 py-1 rounded-full ${statusStyle(tx.status)}`}>
+                                {tx.status}
+                            </span>
+                        </div>
+                    </div>
+                ))}
             </div>
         </DashboardLayout>
     );

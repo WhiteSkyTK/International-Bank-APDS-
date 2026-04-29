@@ -1,15 +1,19 @@
 import React from 'react';
 
-export const InputField = ({ label, type = "text", placeholder, value, onChange }) => (
-    <div className="flex flex-col mb-5">
-        <label className="text-[13px] font-medium text-gray-600 mb-1">{label}</label>
-        <input 
-            type={type} 
-            placeholder={placeholder}
-            value={value}
-            onChange={onChange}
-            className="w-full border-b border-gray-400 bg-transparent py-2 text-gray-900 font-semibold outline-none focus:border-[#4A80D4] focus:border-b-2 transition placeholder:text-gray-300 placeholder:font-normal" 
-            required 
-        />
-    </div>
-);
+export const InputField = ({ label, name, type = "text", value, onChange, placeholder }) => {
+    return (
+        <div className="flex flex-col space-y-1">
+            <label className="text-[13px] font-bold text-gray-700 ml-1">
+                {label}
+            </label>
+            <input
+                name={name}
+                type={type}
+                value={value} // This links to your formData
+                onChange={onChange} // This MUST be here for typing to work
+                placeholder={placeholder}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4A80D4] focus:ring-2 focus:ring-[#4A80D4]/20 outline-none transition-all text-sm bg-gray-50/50"
+            />
+        </div>
+    );
+};
