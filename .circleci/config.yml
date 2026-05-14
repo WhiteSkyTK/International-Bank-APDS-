@@ -1,22 +1,135 @@
 # .circleci/config.yml
+# Task 3 — CircleCI pipeline with SonarQube scan for code hotspots and smells.
+# Triggers on every push to main/master.
+#
+# Setup required (CircleCI Project Settings → Environment Variables):
+#   SONAR_TOKEN       → from sonarcloud.io (free account)
+#   SONAR_HOST_URL    → https://sonarcloud.io
+
 version: 2.1
-jobs:
-  build-and-test:
+
+orbs:
+  node:     circleci/node@5.2.0
+  sonarcloud: sonarsource/sonarcloud@2.0.0
+
+# ── Reusable executor ────────────────────────────────────────────────────────
+executors:
+  node-executor:
     docker:
-      - image: cimg/node:18.0
+      - image: cimg/node:20.0
+    working_directory: ~/repo
+
+  node-mongo-executor:
+    docker:
+      - image: cimg/node:20.0
+      - image: mongo:7
+        environment:
+          MONGO_INITDB_DATABASE: globalpay_test
+    working_directory: ~/repo
+
+# ── Jobs ─────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ── 1. Install dependencies ─────────────────────────────────────────────────
+  install:
+    executor: node-executor
     steps:
       - checkout
+      - node/install-packages:
+          pkg-manager: npm
       - run:
-          name: "Install Dependencies"
-          command: npm install
-      - run:
-          name: "Run Security Audit"
-          command: npm audit # Fails pipeline if known vulnerabilities are found
-      - run:
-          name: "SonarQube Scan"
-          command: echo "Running SonarQube static code analysis..."
+          name: Install backend dependencies
+          command: cd backend && npm install
+      - persist_to_workspace:
+          root: ~/repo
+          paths:
+            - node_modules
+            - backend/node_modules
 
+  # ── 2. ESLint Code Quality ───────────────────────────────────────────────────
+  lint:
+    executor: node-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/repo
+      - run:
+          name: Run ESLint
+          command: npx eslint src/ --ext .js,.jsx --max-warnings 10
+          no_output_timeout: 5m
+
+  # ── 3. SCA — npm audit ───────────────────────────────────────────────────────
+  dependency-scan:
+    executor: node-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/repo
+      - run:
+          name: Audit frontend dependencies
+          command: npm audit --audit-level=high
+      - run:
+          name: Audit backend dependencies
+          command: cd backend && npm audit --audit-level=high
+
+  # ── 4. API Security Tests ────────────────────────────────────────────────────
+  api-tests:
+    executor: node-mongo-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/repo
+      - run:
+          name: Wait for MongoDB
+          command: dockerize -wait tcp://localhost:27017 -timeout 30s
+      - run:
+          name: Run Jest security tests
+          command: cd backend && npm test
+          environment:
+            MONGO_URI:   mongodb://localhost:27017/globalpay_test
+            JWT_SECRET:  test-secret-ci
+            NODE_ENV:    test
+
+  # ── 5. Build Verification ────────────────────────────────────────────────────
+  build:
+    executor: node-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/repo
+      - run:
+          name: Build React app
+          command: npm run build
+
+  # ── 6. SonarQube Scan (SAST — hotspots & code smells) ───────────────────────
+  sonarqube-scan:
+    executor: node-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/repo
+      - sonarcloud/scan:
+          sonar_token_variable_name: SONAR_TOKEN
+
+# ── Workflow ──────────────────────────────────────────────────────────────────
 workflows:
-  security-pipeline:
+  devsecops-pipeline:
     jobs:
-      - build-and-test
+      - install
+
+      - lint:
+          requires: [install]
+
+      - dependency-scan:
+          requires: [install]
+
+      - api-tests:
+          requires: [install]
+
+      - build:
+          requires: [lint]
+
+      # SonarQube runs last so all build artifacts are available
+      - sonarqube-scan:
+          requires: [build]
+          context: SonarCloud   # create this context in CircleCI and add SONAR_TOKEN to it
