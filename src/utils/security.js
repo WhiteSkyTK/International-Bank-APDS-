@@ -1,20 +1,11 @@
-// Strict Whitelisting RegEx Patterns to prevent SQLi and XSS
 // src/utils/security.js
 export const SecurityPatterns = {
-    name: /^[a-zA-Z\s]{2,50}$/,
-    idNumber: /^[0-9]{13}$/,
-    accountNumber: /^[0-9]{8,12}$/,
-    username: /^[a-zA-Z0-9_]{4,20}$/,
-    password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-    swiftCode: /^[A-Z0-9]{8,11}$/,
-    amount: /^\d+(\.\d{1,2})?$/
-};
-
-export const hashPassword = async (password) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hash))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+    name:          /^[a-zA-Z\s]{2,50}$/,
+    idNumber:      /^\d{13}$/,               // FIX: \d not [0-9]
+    accountNumber: /^\d{8,12}$/,             // FIX: \d not [0-9]
+    username:      /^\w{4,20}$/,             // FIX: \w not [a-zA-Z0-9_]
+    password:      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+    swiftCode:     /^[A-Z0-9]{8,11}$/,
+    amount:        /^\d+(\.\d{1,2})?$/,
+    employeeId:    /^EMP\d{3,6}$/
 };
