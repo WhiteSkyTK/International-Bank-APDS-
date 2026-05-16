@@ -54,7 +54,7 @@ export const Login = () => {
             } else {
                 setError(data.error || 'Login failed. Please try again.');
             }
-        } catch (err) {
+        } catch {
             setError('Cannot connect to secure server. Ensure the backend is running.');
         } finally {
             setLoading(false);

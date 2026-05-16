@@ -1,20 +1,22 @@
 // src/components/layout/EmployeeLayout.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, ClipboardCheck, LogOut, Bell, Clock, AlertTriangle, X, ShieldCheck } from 'lucide-react';
 
-// ── Inactivity hook (8-hour sessions for employees, 2-min warning) ────────────
+// ── Move constants outside the hook ──────────────────────────────────────────
+const TIMEOUT = 8 * 60 * 60 * 1000;  // 8 hours
+const WARN    = 2 * 60 * 1000;        // warn 2 min before
+
+// ── Inactivity hook ────────────────────────────────────────────────────────
 const useEmployeeInactivity = (onLogout) => {
-    const TIMEOUT = 8 * 60 * 60 * 1000;  // 8 hours
-    const WARN    = 2 * 60 * 1000;        // warn 2 min before
     const timerRef = useRef(null);
     const warnRef  = useRef(null);
     const countRef = useRef(null);
     const [showWarn, setShowWarn] = useState(false);
     const [secs, setSecs]         = useState(120);
 
-    const reset = React.useCallback(() => {
-        setShowWarn(false);
+    const reset = useCallback((isInitial = false) => {
+        if (isInitial !== true) setShowWarn(false);
         clearTimeout(timerRef.current);
         clearTimeout(warnRef.current);
         clearInterval(countRef.current);
@@ -31,31 +33,57 @@ const useEmployeeInactivity = (onLogout) => {
 
     useEffect(() => {
         const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
-        events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
-        reset();
+        const handleEvent = () => reset(false);
+        
+        events.forEach((e) => window.addEventListener(e, handleEvent, { passive: true }));
+        reset(true); // Pass true to avoid setting state synchronously during mount
+        
+        // Safely capture refs for the cleanup phase
+        const currentTimer = timerRef.current;
+        const currentWarn = warnRef.current;
+        const currentCount = countRef.current;
+        
         return () => {
-            events.forEach((e) => window.removeEventListener(e, reset));
-            clearTimeout(timerRef.current);
-            clearTimeout(warnRef.current);
-            clearInterval(countRef.current);
+            events.forEach((e) => window.removeEventListener(e, handleEvent));
+            clearTimeout(currentTimer);
+            clearTimeout(currentWarn);
+            clearInterval(currentCount);
         };
     }, [reset]);
 
-    return { showWarn, secs, reset };
+    return { showWarn, secs, reset: () => reset(false) };
+};
+
+// ── Move NavItem outside to prevent re-renders ─────────────────────────────
+const NavItem = ({ icon, label, path }) => {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const active = location.pathname === path;
+    return (
+        <div onClick={() => navigate(path)}
+            className={`flex items-center gap-4 p-4 rounded-2xl transition cursor-pointer font-medium ${
+                active ? 'bg-white text-red-700 shadow-lg' : 'hover:bg-white/10 text-red-100/70 hover:text-white'
+            }`}>
+            {icon} <span>{label}</span>
+        </div>
+    );
 };
 
 export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
     const navigate  = useNavigate();
-    const location  = useLocation();
-    const [employee, setEmployee] = useState(null);
     const [now, setNow] = useState(new Date());
+
+    // ── Lazy State Initialization ──────────────────────────────────────────
+    const [employee, setEmployee] = useState(() => {
+        return JSON.parse(localStorage.getItem('employee')) || null;
+    });
 
     useEffect(() => {
         const tick = setInterval(() => setNow(new Date()), 1000);
         return () => clearInterval(tick);
     }, []);
 
-    const handleLogout = React.useCallback(() => {
+    const handleLogout = useCallback(() => {
         localStorage.removeItem('empToken');
         localStorage.removeItem('employee');
         navigate('/employee/login');
@@ -63,24 +91,13 @@ export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
 
     const { showWarn, secs, reset: stayIn } = useEmployeeInactivity(handleLogout);
 
+    // ── Redirect handling simplified ───────────────────────────────────────
     useEffect(() => {
-        const emp   = JSON.parse(localStorage.getItem('employee'));
         const token = localStorage.getItem('empToken');
-        if (!emp || !token) { navigate('/employee/login'); return; }
-        setEmployee(emp);
-    }, [navigate]);
-
-    const NavItem = ({ icon, label, path }) => {
-        const active = location.pathname === path;
-        return (
-            <div onClick={() => navigate(path)}
-                className={`flex items-center gap-4 p-4 rounded-2xl transition cursor-pointer font-medium ${
-                    active ? 'bg-white text-red-700 shadow-lg' : 'hover:bg-white/10 text-red-100/70 hover:text-white'
-                }`}>
-                {icon} <span>{label}</span>
-            </div>
-        );
-    };
+        if (!employee || !token) { 
+            navigate('/employee/login'); 
+        }
+    }, [employee, navigate]);
 
     if (!employee) return null;
 

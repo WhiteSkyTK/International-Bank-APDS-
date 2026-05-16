@@ -57,7 +57,7 @@ export const Register = () => {
             } else {
                 setErrorMsg(data.error || 'Registration failed.');
             }
-        } catch (err) {
+        } catch {
             setErrorMsg('Cannot connect to server. Ensure the backend is running over HTTPS.');
         } finally {
             setLoading(false);

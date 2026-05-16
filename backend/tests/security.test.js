@@ -1,4 +1,4 @@
-// backend/tests/security.test.js
+/* eslint-env node, jest */
 // Runs in GitHub Actions CI against a local MongoDB container.
 // Tests: input whitelisting, password hashing, JWT validation, security headers.
 
@@ -31,7 +31,9 @@ afterAll(async () => {
     try {
         await mongoose.connection.dropDatabase();
         await mongoose.connection.close();
-    } catch (_) {}
+    } catch {
+    // Suppress error
+}
 });
 
 // ── 1. Security Headers ───────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ export const Transactions = () => {
             }
             const data = await res.json();
             setHistory(data);
-        } catch (err) {
+        } catch {
             setError(err.message || 'Could not reach the server.');
         } finally {
             setLoading(false);

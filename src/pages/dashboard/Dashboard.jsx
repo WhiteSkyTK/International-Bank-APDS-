@@ -7,16 +7,13 @@ export const DashboardLayout = ({ children, title = "Dashboard Overview" }) => {
     const location = useLocation();
     
     // 1. Logic to get the logged-in user
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user')) || null);
 
     useEffect(() => {
-        const savedUser = JSON.parse(localStorage.getItem('user'));
-        if (savedUser) {
-            setUser(savedUser);
-        } else {
-            navigate('/login');
-        }
-    }, [navigate]);
+    if (!user) {
+        navigate('/login');
+    }
+}, [user, navigate]);
 
     const handleLogout = () => {
         localStorage.removeItem('user');

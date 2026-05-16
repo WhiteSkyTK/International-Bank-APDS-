@@ -1,4 +1,4 @@
-// backend/server.js
+/* eslint-env node */
 require('dotenv').config();
 const express   = require('express');
 const cors      = require('cors');
@@ -172,7 +172,7 @@ app.post('/api/register', registerLimiter, async (req, res) => {
         await notify(newUser._id, '🎉', 'Welcome to GlobalPay!', `Hi ${fullName.split(' ')[0]}, your account is ready.`);
         await audit('CUSTOMER_REGISTER', username, 'customer', `New account created`, req);
         res.status(201).json({ message: 'Registration successful!', accountNumber: newUser.accountNumber });
-    } catch (err) {
+    } catch  {
         const status = err.code === 11000 ? 409 : 500;
         const message = err.code === 11000 ? 'Account already exists.' : 'Server error during registration.';
         res.status(status).json({ error: message });
@@ -209,7 +209,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
                 balance:       user.balance
             }
         });
-    } catch (err) {
+    } catch {
         console.error('Login error:', err.message);
         res.status(500).json({ error: 'Server error during login.' });
     }
@@ -271,7 +271,7 @@ app.post('/api/employee/login', loginLimiter, async (req, res) => {
             employee: { id: emp._id, fullName: emp.fullName, username: emp.username, employeeId: emp.employeeId, role: 'employee' }
         });
         
-    } catch (err) {
+    } catch  {
         console.error('💥 [CRITICAL SERVER ERROR]:', err.message);
         res.status(500).json({ error: 'Server error during login.' });
     }
@@ -312,7 +312,7 @@ app.post('/api/pay', authenticate, async (req, res) => {
         await audit('PAYMENT_SUBMITTED', req.user.id, 'customer', `Payment to ${payeeName} SWIFT:${swiftCode}`, req);
 
         res.status(201).json({ message: 'Payment submitted.', newBalance: user.balance, transactionId: payment._id });
-    } catch (err) {
+    } catch {
         console.error('Payment error:', err.message);
         res.status(500).json({ error: 'Payment processing failed.' });
     }
@@ -324,7 +324,7 @@ app.get('/api/transactions/:userId', authenticate, async (req, res) => {
     try {
         const history = await Payment.find({ userId: String(req.params.userId) }).sort({ createdAt: -1 });
         res.json(history);
-    } catch (err) {
+    } catch {
         console.error('Transaction fetch error:', err.message);
         res.status(500).json({ error: 'Could not fetch transactions.' });
     }
@@ -335,7 +335,7 @@ app.get('/api/employee/payments', authenticate, employeeOnly, async (req, res) =
     try {
         const payments = await Payment.find().sort({ createdAt: -1 }).populate('userId', 'fullName accountNumber');
         res.json(payments);
-    } catch (err) {
+    } catch {
         console.error('Employee payment fetch error:', err.message);
         res.status(500).json({ error: 'Could not fetch payments.' });
     }
@@ -355,7 +355,7 @@ app.patch('/api/employee/payments/:id/verify', authenticate, employeeOnly, async
         await audit('PAYMENT_VERIFIED', req.user.id, 'employee', `Verified payment ${req.params.id}`, req);
 
         res.json({ message: 'Payment verified.', payment });
-    } catch (err) {
+    } catch {
         console.error('Verify error:', err.message);
         res.status(500).json({ error: 'Could not verify.' });
     }
@@ -376,7 +376,7 @@ app.patch('/api/employee/payments/:id/reject', authenticate, employeeOnly, async
         await audit('PAYMENT_REJECTED', req.user.id, 'employee', `Rejected payment ${req.params.id}`, req);
 
         res.json({ message: 'Payment rejected and customer refunded.', payment });
-    } catch (err) {
+    } catch {
         console.error('Reject error:', err.message);
         res.status(500).json({ error: 'Could not reject.' });
     }
@@ -396,7 +396,7 @@ app.post('/api/employee/submit-swift', authenticate, employeeOnly, async (req, r
 
         await audit('SWIFT_SUBMISSION', req.user.id, 'employee', `Submitted ${verified.length} payments to SWIFT`, req);
         res.json({ message: `${verified.length} payment(s) submitted to SWIFT.`, count: verified.length });
-    } catch (err) {
+    } catch {
         console.error('SWIFT submit error:', err.message);
         res.status(500).json({ error: 'SWIFT submission failed.' });
     }
@@ -407,7 +407,7 @@ app.get('/api/employee/audit-log', authenticate, employeeOnly, async (req, res) 
     try {
         const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(100);
         res.json(logs);
-    } catch (err) {
+    } catch {
         console.error('Audit log error:', err.message);
         res.status(500).json({ error: 'Could not fetch audit logs.' });
     }
@@ -419,7 +419,7 @@ app.get('/api/notifications/:userId', authenticate, async (req, res) => {
     try {
         const notifs = await Notification.find({ userId: String(req.params.userId) }).sort({ createdAt: -1 }).limit(20);
         res.json(notifs);
-    } catch (err) {
+    } catch {
         console.error('Notification fetch error:', err.message);
         res.status(500).json({ error: 'Could not fetch.' });
     }
@@ -430,7 +430,7 @@ app.patch('/api/notifications/:userId/read-all', authenticate, async (req, res) 
     try {
         await Notification.updateMany({ userId: String(req.params.userId) }, { read: true });
         res.json({ message: 'All read.' });
-    } catch (err) {
+    } catch {
         console.error('Mark read error:', err.message);
         res.status(500).json({ error: 'Failed.' });
     }
@@ -443,7 +443,7 @@ app.delete('/api/notifications/:id', authenticate, async (req, res) => {
         if (n.userId.toString() !== req.user.id.toString()) return res.status(403).json({ error: 'Unauthorised.' });
         await n.deleteOne();
         res.json({ message: 'Dismissed.' });
-    } catch (err) {
+    } catch {
         console.error('Delete notification error:', err.message);
         res.status(500).json({ error: 'Failed.' });
     }
