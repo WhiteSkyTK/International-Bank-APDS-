@@ -60,7 +60,7 @@ const userSchema = new mongoose.Schema({
     fullName:      { type: String, required: true },
     username:      { type: String, required: true, unique: true },
     idNumber:      { type: String, required: true, unique: true },
-    accountNumber: { type: String, unique: true, default: () => `8818${Math.floor(100000 + Math.random() * 900000)}` },
+    accountNumber: { type: String, unique: true, default: () => `8818${require('node:crypto').randomInt(100000, 1000000)}` },
     password:      { type: String, required: true },
     balance:       { type: Number, default: 50000 },   // FIX: no zero fraction
     role:          { type: String, default: 'customer' }
