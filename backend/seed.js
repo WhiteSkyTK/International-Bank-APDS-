@@ -13,6 +13,7 @@ const EMPLOYEES = [
     { fullName: 'James Okafor',   username: 'emp.james',  employeeId: 'EMP001', password: 'Employee@1234' },
     { fullName: 'Sarah Mitchell', username: 'emp.sarah',  employeeId: 'EMP002', password: 'Employee@5678' },
     { fullName: 'David Nkosi',    username: 'emp.david',  employeeId: 'EMP003', password: 'Employee@9012' },
+    { fullName: 'Tokolo Nonayne',    username: '10296818',  employeeId: 'EMP004', password: 'Innocent10!' },
 ];
 
 const employeeSchema = new mongoose.Schema({

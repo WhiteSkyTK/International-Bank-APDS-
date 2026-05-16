@@ -45,7 +45,7 @@ const registerLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: 
 // FIX: use \w instead of [a-zA-Z0-9_], use \d instead of [0-9]
 const patterns = {
     name:          /^[a-zA-Z\s]{2,50}$/,
-    username:      /^\w{4,20}$/,              // FIX: \w
+    username:      /^[\w.]{4,20}$/,              // FIX: \w
     idNumber:      /^\d{13}$/,                // FIX: \d
     accountNumber: /^\d{8,12}$/,              // FIX: \d
     password:      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
