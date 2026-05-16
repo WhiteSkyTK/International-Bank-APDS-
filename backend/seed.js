@@ -1,9 +1,4 @@
 // backend/seed.js
-// Run ONCE to create pre-configured employee accounts:
-//   node seed.js
-//
-// Employees cannot self-register. This script is the ONLY way to create them.
-// In production this would be run by a system administrator on first deployment.
 
 require('dotenv').config();
 const mongoose = require('mongoose');
