@@ -137,7 +137,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 // ── 7. HELPERS ────────────────────────────────────────────────────────────────
 const notify = (userId, icon, title, body) =>
-    new Notification({ userId, icon, title, body }).save().catch(() => {});
+    new Notification({ userId, icon, title, body }).save().catch((err) => console.warn('Handled exception:', err.message));
 
 const audit = (action, performedBy, role, details, req) =>
     new AuditLog({
@@ -146,7 +146,7 @@ const audit = (action, performedBy, role, details, req) =>
         role,
         details,
         ipAddress: req?.ip ?? 'unknown'
-    }).save().catch(() => {});
+    }).save().catch((err) => console.warn('Handled exception:', err.message));
 
 // ── 8. HEALTH ─────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
