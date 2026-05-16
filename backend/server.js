@@ -216,30 +216,63 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 });
 
 // ── 10. EMPLOYEE AUTH (no registration endpoint) ──────────────────────────────
+// backend/server.js — Replace the employee login route
 app.post('/api/employee/login', loginLimiter, async (req, res) => {
     const { username, employeeId, password } = req.body;
+    
+    console.log(`\n=== 🔐 [DEBUG] Employee Login Attempt ===`);
+    console.log(`📥 Received Input - Username: "${username}", EmpID: "${employeeId}"`);
 
-    if (!patterns.username.test(username))     return res.status(400).json({ error: 'Invalid username.' });
-    if (!patterns.employeeId.test(employeeId)) return res.status(400).json({ error: 'Invalid employee ID.' });
+    // 1. Validate inputs against patterns
+    if (!patterns.username.test(username)) {
+        console.log(`❌ [VALIDATION FAILED] Username "${username}" violates regex rules.`);
+        return res.status(400).json({ error: 'Invalid username.' });
+    }
+    if (!patterns.employeeId.test(employeeId)) {
+        console.log(`❌ [VALIDATION FAILED] Employee ID "${employeeId}" violates regex rules.`);
+        return res.status(400).json({ error: 'Invalid employee ID.' });
+    }
 
     try {
-        // FIX (BLOCKER): sanitize before query
         const safeUsername   = String(username).trim();
         const safeEmployeeId = String(employeeId).trim();
 
+        // 2. Query MongoDB
+        console.log(`🔍 Querying MongoDB for: username="${safeUsername}" AND employeeId="${safeEmployeeId}"`);
         const emp = await Employee.findOne({ username: safeUsername, employeeId: safeEmployeeId });
-        if (!emp || !await bcrypt.compare(password, emp.password))
+        
+        if (!emp) {
+            console.log(`❌ [DB MATCH FAILED] No employee records match those credentials.`);
             return res.status(401).json({ error: 'Invalid credentials.' });
+        }
+        
+        console.log(`⏳ [DB MATCH SUCCESS] Found record for ${emp.fullName}. Checking password...`);
 
-        const token = jwt.sign({ id: emp._id, role: 'employee', employeeId: emp.employeeId }, JWT_SECRET, { expiresIn: '8h' });
+        // 3. Compare Bcrypt Passwords
+        const isPasswordMatch = await bcrypt.compare(password, emp.password);
+        if (!isPasswordMatch) {
+            console.log(`❌ [BCRYPT FAILED] Password verification failed for ${safeUsername}.`);
+            return res.status(401).json({ error: 'Invalid credentials.' });
+        }
+
+        // 4. Successful Login
+        console.log(`✅ [LOGIN SUCCESS] Authorization granted for ${emp.fullName} (${safeEmployeeId})`);
+        
+        const token = jwt.sign(
+            { id: emp._id, role: 'employee', employeeId: emp.employeeId }, 
+            JWT_SECRET, 
+            { expiresIn: '8h' }
+        );
+        
         await audit('EMPLOYEE_LOGIN', safeUsername, 'employee', `Employee ${safeEmployeeId} logged in`, req);
 
         res.json({
             token,
             employee: { id: emp._id, fullName: emp.fullName, username: emp.username, employeeId: emp.employeeId, role: 'employee' }
         });
+        
     } catch (err) {
-        console.error('Employee login error:', err.message);
+        console.error('💥 [CRITICAL SERVER ERROR]:', err.message);
         res.status(500).json({ error: 'Server error during login.' });
     }
 });
