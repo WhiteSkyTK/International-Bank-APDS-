@@ -35,11 +35,12 @@ jobs:
     executor: node-executor
     steps:
       - checkout
-      - node/install-packages:
-          pkg-manager: npm
+      - run:
+          name: Install frontend dependencies
+          command: npm install --legacy-peer-deps
       - run:
           name: Install backend dependencies
-          command: cd backend && npm install
+          command: cd backend && npm install --legacy-peer-deps
       - persist_to_workspace:
           root: ~/repo
           paths:

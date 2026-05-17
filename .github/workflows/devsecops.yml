@@ -34,13 +34,13 @@ jobs:
         with:
           node-version: 20
       - name: Install frontend dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps 
       - name: Audit frontend dependencies
         run: npm audit --audit-level=critical
         continue-on-error: true          # warn but don't block
       - name: Install backend dependencies
         working-directory: ./backend
-        run: npm install
+        run: npm install --legacy-peer-deps 
       - name: Audit backend dependencies
         working-directory: ./backend
         run: npm audit --audit-level=critical
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      - run: npm install --legacy-peer-deps
       - name: Run ESLint
         run: npx eslint src/ --ext .js,.jsx --max-warnings 30
         continue-on-error: true          # show warnings in log, don't block build
@@ -74,7 +74,7 @@ jobs:
           node-version: 20
       - name: Install backend dependencies
         working-directory: ./backend
-        run: npm install
+        run: npm install --legacy-peer-deps 
       - name: Run security tests
         working-directory: ./backend
         env:
@@ -93,5 +93,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      - run: npm install --legacy-peer-deps
       - run: npm run build
