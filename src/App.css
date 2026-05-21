@@ -1,0 +1,10 @@
+/* src/App.css */
+/* GlobalPay — Application-level CSS variables */
+/* Component styles use Tailwind utility classes defined in JSX files. */
+
+:root {
+    --color-primary:        #4A80D4;
+    --color-primary-dark:   #1C4382;
+    --color-employee:       #C0392B;
+    --color-employee-dark:  #7B1A1A;
+}

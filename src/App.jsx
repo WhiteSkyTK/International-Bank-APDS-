@@ -1,5 +1,6 @@
 // src/App.jsx
 import React from 'react';
+import PropTypes from 'prop-types';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Customer Auth
@@ -24,16 +25,18 @@ import { EmployeePayments }    from './pages/employee/EmployeePayments';
 import { EmployeeSecurityLog } from './pages/employee/EmployeeSecurityLog';
 import { EmployeeSupport }     from './pages/employee/EmployeeSupport';
 
-// Route guards
+// FIX: PropTypes added to both route guards
 const CustomerRoute = ({ children }) => {
     const ok = localStorage.getItem('user') && localStorage.getItem('token');
     return ok ? children : <Navigate to="/login" replace />;
 };
+CustomerRoute.propTypes = { children: PropTypes.node.isRequired };
 
 const EmployeeRoute = ({ children }) => {
     const ok = localStorage.getItem('employee') && localStorage.getItem('empToken');
     return ok ? children : <Navigate to="/employee/login" replace />;
 };
+EmployeeRoute.propTypes = { children: PropTypes.node.isRequired };
 
 export default function App() {
     return (
