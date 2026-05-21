@@ -1,217 +1,219 @@
-// src/components/layout/DashboardLayout.jsx
-import React, { useState, useEffect, useRef } from 'react';
+// src/components/layout/EmployeeLayout.jsx
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Bell, CreditCard, Send, History, User, MessageSquare, ShieldCheck, LogOut, X, Clock, AlertTriangle } from 'lucide-react';
-import { useInactivityLogout } from '../../hooks/useInactivityLogout';
-import { secureFetch } from '../../utils/secureFetch';
+// FIX: removed unused Bell and X imports
+import { LayoutDashboard, ClipboardCheck, LogOut, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
 
-// FIX: NavItem moved OUTSIDE parent component
-const NavItem = ({ icon, label, path, navigate, currentPath }) => {
-    const active = currentPath === path;
+const TIMEOUT_MS = 8 * 60 * 60 * 1000;  // 8 hours
+const WARN_MS    = 2 * 60 * 1000;        // warn 2 min before
+
+// FIX: extracted countdown to module level — reduces nesting depth below 4
+const runCountdown = (setSecs, intervalRef) => {
+    setSecs(120);
+    intervalRef.current = setInterval(() => {
+        setSecs((s) => {
+            if (s <= 1) {
+                clearInterval(intervalRef.current);
+                return 0;
+            }
+            return s - 1;
+        });
+    }, 1000);
+};
+
+const useEmployeeInactivity = (onLogout) => {
+    const timerRef = useRef(null);
+    const warnRef  = useRef(null);
+    const countRef = useRef(null);
+    const [showWarn, setShowWarn] = useState(false);
+    const [secs,     setSecs]     = useState(120);
+
+    const reset = useCallback((isInitial = false) => {
+        if (isInitial !== true) setShowWarn(false);
+        clearTimeout(timerRef.current);
+        clearTimeout(warnRef.current);
+        clearInterval(countRef.current);
+
+        // FIX: countdown logic extracted — nesting depth is now within limit
+        warnRef.current = setTimeout(() => {
+            setShowWarn(true);
+            runCountdown(setSecs, countRef);
+        }, TIMEOUT_MS - WARN_MS);
+
+        timerRef.current = setTimeout(onLogout, TIMEOUT_MS);
+    }, [onLogout]);
+
+    useEffect(() => {
+        const events      = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+        const handleEvent = () => reset(false);
+
+        // FIX: globalThis instead of window
+        events.forEach((e) => globalThis.addEventListener(e, handleEvent, { passive: true }));
+        reset(true);
+
+        return () => {
+            events.forEach((e) => globalThis.removeEventListener(e, handleEvent));
+            clearTimeout(timerRef.current);
+            clearTimeout(warnRef.current);
+            clearInterval(countRef.current);
+        };
+    }, [reset]);
+
+    return { showWarn, secs, stay: () => reset(false) };
+};
+
+// FIX: NavItem outside parent, uses <button> for accessibility, PropTypes added
+const NavItem = ({ icon, label, path }) => {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const active   = location.pathname === path;
     return (
-        // FIX: role + onKeyDown for accessibility
-        <div
-            role="button"
-            tabIndex={0}
+        <button
+            type="button"
             onClick={() => navigate(path)}
-            onKeyDown={(e) => e.key === 'Enter' && navigate(path)}
-            className={`flex items-center gap-4 p-4 rounded-2xl transition cursor-pointer font-medium ${
-                active ? 'bg-white text-[#1C4382] shadow-lg' : 'hover:bg-white/5 text-blue-100/70 hover:text-white'
+            className={`w-full flex items-center gap-4 p-4 rounded-2xl transition font-medium text-left ${
+                active
+                    ? 'bg-white text-red-700 shadow-lg'
+                    : 'hover:bg-white/10 text-red-100/70 hover:text-white'
             }`}
         >
             {icon} <span>{label}</span>
-        </div>
+        </button>
     );
 };
 
-// FIX: PropTypes for NavItem
 NavItem.propTypes = {
-    icon:        PropTypes.node.isRequired,
-    label:       PropTypes.string.isRequired,
-    path:        PropTypes.string.isRequired,
-    navigate:    PropTypes.func.isRequired,
-    currentPath: PropTypes.string.isRequired
+    icon:  PropTypes.node.isRequired,
+    label: PropTypes.string.isRequired,
+    path:  PropTypes.string.isRequired
 };
 
-export const DashboardLayout = ({ children, title }) => {
-    const navigate  = useNavigate();
-    const location  = useLocation();
-    const [user, setUser] = useState(null);
-    const [now, setNow]   = useState(new Date());
+export const EmployeeLayout = ({ children, title }) => {
+    const navigate = useNavigate();
+    const [now, setNow] = useState(new Date());
+
+    // FIX: read employee directly without setEmployee (was flagged as unused setter)
+    const employee = JSON.parse(localStorage.getItem('employee'));
 
     useEffect(() => {
         const tick = setInterval(() => setNow(new Date()), 1000);
         return () => clearInterval(tick);
     }, []);
 
-    const [notifications, setNotifications] = useState([]);
-    const [notifOpen, setNotifOpen]         = useState(false);
-    const notifRef                          = useRef(null);
-    const unreadCount = notifications.filter((n) => !n.read).length;
-
-    const fetchNotifications = async (uid) => {
-        try {
-            const res = await secureFetch(`https://localhost:5000/api/notifications/${uid}`);
-            if (res?.ok) {
-                const data = await res.json();
-                setNotifications(data);
-            }
-        } catch (_err) { /* non-critical — silent */ }
-    };
-
-    useEffect(() => {
-        const handler = (e) => {
-            if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
-
-    const markAllRead = async () => {
-        // FIX: optional chain
-        const uid = JSON.parse(localStorage.getItem('user'))?.id;
-        if (!uid) return;
-        try {
-            await secureFetch(`https://localhost:5000/api/notifications/${uid}/read-all`, { method: 'PATCH' });
-            setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-        } catch (_err) { /* silent */ }
-    };
-
-    const dismissNotif = async (id) => {
-        try {
-            await secureFetch(`https://localhost:5000/api/notifications/${id}`, { method: 'DELETE' });
-            setNotifications((prev) => prev.filter((n) => n._id !== id));
-        } catch (_err) { /* silent */ }
-    };
-
-    const { showWarning, secondsLeft, stayLoggedIn, logout } = useInactivityLogout();
-
-    useEffect(() => {
-        const savedUser = JSON.parse(localStorage.getItem('user'));
-        const token     = localStorage.getItem('token');
-        if (!savedUser || !token) { navigate('/login'); return; }
-        setUser(savedUser);
-        fetchNotifications(savedUser.id);
+    const handleLogout = useCallback(() => {
+        localStorage.removeItem('empToken');
+        localStorage.removeItem('employee');
+        navigate('/employee/login');
     }, [navigate]);
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        navigate('/login');
-    };
+    const { showWarn, secs, stay } = useEmployeeInactivity(handleLogout);
 
-    if (!user) return null;
+    useEffect(() => {
+        const token = localStorage.getItem('empToken');
+        if (!employee || !token) navigate('/employee/login');
+    }, [employee, navigate]);
+
+    if (!employee) return null;
 
     return (
-        <div className="flex h-screen bg-[#E5E7EB] font-sans">
+        <div className="flex h-screen bg-gray-100 font-sans">
 
-            {showWarning && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            {/* Inactivity warning */}
+            {showWarn && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
                         <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <AlertTriangle size={32} className="text-orange-500" />
                         </div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">Still there?</h2>
+                        <h2 className="text-xl font-bold text-gray-800 mb-2">Session Expiring</h2>
                         <p className="text-gray-500 text-sm mb-2">You'll be signed out in:</p>
-                        <p className="text-5xl font-bold text-[#4A80D4] mb-6 tabular-nums">
-                            {String(secondsLeft).padStart(2, '0')}s
+                        <p className="text-5xl font-bold text-red-600 mb-6 tabular-nums">
+                            {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}
                         </p>
                         <div className="flex gap-3">
-                            <button onClick={logout} className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 text-sm">Sign Out</button>
-                            <button onClick={stayLoggedIn} className="flex-1 py-3 rounded-xl bg-[#4A80D4] text-white font-bold text-sm">Stay Logged In</button>
+                            <button type="button" onClick={handleLogout}
+                                className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 text-sm hover:bg-gray-50 transition">
+                                Sign Out
+                            </button>
+                            <button type="button" onClick={stay}
+                                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition">
+                                Stay Logged In
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            <div className="w-64 lg:w-72 bg-[#1C4382] text-white flex flex-col p-4 lg:p-6 shadow-xl hidden md:flex shrink-0">
-                <h1 className="text-2xl font-bold mb-8 tracking-tighter">GLOBALPAY</h1>
+            {/* Sidebar */}
+            <div className="w-64 lg:w-72 bg-[#7B1A1A] text-white flex flex-col p-4 lg:p-6 shadow-xl hidden md:flex shrink-0">
+                <div className="mb-8">
+                    <h1 className="text-2xl font-bold tracking-tighter">GLOBALPAY</h1>
+                    <p className="text-red-300 text-xs tracking-[0.25em] uppercase mt-0.5">Staff Portal</p>
+                </div>
+
                 <div className="flex items-center gap-3 mb-8 bg-white/10 p-3 rounded-2xl">
-                    <div className="w-10 h-10 bg-white text-[#1C4382] rounded-full flex items-center justify-center font-bold text-lg">
-                        {user.fullName?.charAt(0) ?? 'U'}
+                    <div className="w-10 h-10 bg-red-200 text-red-800 rounded-full flex items-center justify-center font-bold text-lg shadow">
+                        {employee.fullName?.charAt(0) ?? 'E'}
                     </div>
                     <div className="min-w-0">
-                        <p className="font-bold text-sm truncate">{user.fullName}</p>
-                        <p className="text-[10px] text-blue-200 opacity-70 uppercase">···· {user.accountNumber?.slice(-4) ?? '????'}</p>
+                        <p className="font-bold text-sm truncate">{employee.fullName}</p>
+                        <p className="text-[10px] text-red-300 uppercase tracking-wider">{employee.employeeId}</p>
                     </div>
                 </div>
 
-                <nav className="space-y-1 mb-6">
-                    <NavItem icon={<CreditCard size={20} />} label="Overview"     path="/dashboard"    navigate={navigate} currentPath={location.pathname} />
-                    <NavItem icon={<Send size={20} />}       label="Make Payment" path="/payment"       navigate={navigate} currentPath={location.pathname} />
-                    <NavItem icon={<History size={20} />}    label="Transactions" path="/transactions"  navigate={navigate} currentPath={location.pathname} />
-                </nav>
+                <div className="text-[10px] uppercase font-bold tracking-widest text-red-400/60 mb-2 ml-2">Navigation</div>
                 <nav className="space-y-1 flex-grow">
-                    <NavItem icon={<User size={20} />}          label="My Profile" path="/profile"   navigate={navigate} currentPath={location.pathname} />
-                    <NavItem icon={<MessageSquare size={20} />} label="Support"    path="/support"   navigate={navigate} currentPath={location.pathname} />
-                    <NavItem icon={<ShieldCheck size={20} />}   label="Security"   path="/security"  navigate={navigate} currentPath={location.pathname} />
+                    <NavItem icon={<LayoutDashboard size={20} />} label="Dashboard"      path="/employee/dashboard" />
+                    <NavItem icon={<ClipboardCheck size={20} />}  label="Verify Payments" path="/employee/payments" />
                 </nav>
 
-                <button onClick={handleLogout} className="mt-auto flex items-center gap-3 p-4 rounded-2xl border border-white/20 hover:bg-red-500/20 transition font-bold text-sm">
-                    <LogOut size={20} className="text-red-400" /> Sign Out
+                <div className="mb-4 bg-white/5 rounded-2xl p-3">
+                    <div className="flex items-center gap-2 text-red-200 text-[11px] mb-1">
+                        <Clock size={12} /> Session Active
+                    </div>
+                    <p className="text-white font-mono text-sm font-bold">
+                        {now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </p>
+                    <p className="text-red-300 text-[10px] mt-0.5">
+                        {now.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </p>
+                </div>
+
+                <button type="button" onClick={handleLogout}
+                    className="flex items-center gap-3 p-4 rounded-2xl border border-white/20 hover:bg-red-500/30 transition font-bold text-sm">
+                    <LogOut size={20} className="text-red-300" /> Sign Out
                 </button>
             </div>
 
+            {/* Main */}
             <div className="flex-grow flex flex-col overflow-hidden">
                 <header className="bg-white px-6 py-4 shadow-sm flex justify-between items-center shrink-0">
                     <h2 className="text-xl lg:text-2xl font-bold text-gray-800">{title}</h2>
-                    <div className="flex items-center gap-5">
+                    <div className="flex items-center gap-3">
                         <div className="hidden sm:flex flex-col items-end">
-                            <p className="text-xs font-semibold text-gray-600">
-                                {now.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                            <p className="text-xs font-bold text-gray-600">
+                                {now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </p>
-                            <p className="text-xs text-gray-400 font-mono mt-1 flex items-center gap-1">
-                                <Clock size={10} /> {now.toLocaleTimeString('en-ZA')}
+                            <p className="text-[10px] text-gray-400 font-mono">
+                                {now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </p>
                         </div>
-
-                        <div className="relative" ref={notifRef}>
-                            <button onClick={() => setNotifOpen((o) => !o)} className="relative p-2 rounded-full hover:bg-gray-100 transition">
-                                <Bell size={20} className="text-gray-500" />
-                                {/* FIX: positive condition */}
-                                {unreadCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />}
-                            </button>
-
-                            {notifOpen && (
-                                <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
-                                    <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100">
-                                        <h3 className="font-bold text-gray-800 text-sm">
-                                            Notifications
-                                            {unreadCount > 0 && <span className="ml-2 bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{unreadCount} new</span>}
-                                        </h3>
-                                        {unreadCount > 0 && <button onClick={markAllRead} className="text-[11px] text-[#4A80D4] font-semibold hover:underline">Mark all read</button>}
-                                    </div>
-                                    <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
-                                        {notifications.length === 0
-                                            ? <p className="text-center text-gray-400 text-xs py-8">All caught up 🎉</p>
-                                            : notifications.map((n) => (
-                                                <div key={n._id} className={`flex items-start gap-3 px-5 py-4 ${n.read ? 'bg-white' : 'bg-blue-50/50'}`}>
-                                                    <span className="text-xl mt-0.5 shrink-0">{n.icon ?? '🔔'}</span>
-                                                    <div className="flex-grow min-w-0">
-                                                        <p className={`text-xs font-bold ${n.read ? 'text-gray-800' : 'text-[#1C4382]'}`}>{n.title}</p>
-                                                        <p className="text-[11px] text-gray-500 mt-0.5">{n.body}</p>
-                                                        <p className="text-[10px] text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                                                    </div>
-                                                    <button onClick={() => dismissNotif(n._id)} className="text-gray-300 hover:text-gray-500 transition shrink-0"><X size={14} /></button>
-                                                </div>
-                                            ))
-                                        }
-                                    </div>
-                                </div>
-                            )}
+                        <div className="bg-red-100 text-red-700 px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5">
+                            <ShieldCheck size={12} /> {employee.employeeId}
                         </div>
                     </div>
                 </header>
+
                 <main className="flex-grow p-6 lg:p-10 overflow-y-auto">{children}</main>
             </div>
         </div>
     );
 };
 
-// FIX: PropTypes
-DashboardLayout.propTypes = {
+// FIX: PropTypes for children and title
+EmployeeLayout.propTypes = {
     children: PropTypes.node.isRequired,
     title:    PropTypes.string
 };
-DashboardLayout.defaultProps = { title: 'Dashboard Overview' };
+EmployeeLayout.defaultProps = { title: 'Employee Dashboard' };

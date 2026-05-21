@@ -1,19 +1,33 @@
 // src/components/layout/EmployeeLayout.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ClipboardCheck, LogOut, Bell, Clock, AlertTriangle, X, ShieldCheck } from 'lucide-react';
+// FIX: removed unused Bell and X imports
+import { LayoutDashboard, ClipboardCheck, LogOut, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
 
-// ── Move constants outside the hook ──────────────────────────────────────────
-const TIMEOUT = 8 * 60 * 60 * 1000;  // 8 hours
-const WARN    = 2 * 60 * 1000;        // warn 2 min before
+const TIMEOUT_MS = 8 * 60 * 60 * 1000;  // 8 hours
+const WARN_MS    = 2 * 60 * 1000;        // warn 2 min before
 
-// ── Inactivity hook ────────────────────────────────────────────────────────
+// FIX: extracted countdown to module level — reduces nesting depth below 4
+const runCountdown = (setSecs, intervalRef) => {
+    setSecs(120);
+    intervalRef.current = setInterval(() => {
+        setSecs((s) => {
+            if (s <= 1) {
+                clearInterval(intervalRef.current);
+                return 0;
+            }
+            return s - 1;
+        });
+    }, 1000);
+};
+
 const useEmployeeInactivity = (onLogout) => {
     const timerRef = useRef(null);
     const warnRef  = useRef(null);
     const countRef = useRef(null);
     const [showWarn, setShowWarn] = useState(false);
-    const [secs, setSecs]         = useState(120);
+    const [secs,     setSecs]     = useState(120);
 
     const reset = useCallback((isInitial = false) => {
         if (isInitial !== true) setShowWarn(false);
@@ -21,62 +35,66 @@ const useEmployeeInactivity = (onLogout) => {
         clearTimeout(warnRef.current);
         clearInterval(countRef.current);
 
+        // FIX: countdown logic extracted — nesting depth is now within limit
         warnRef.current = setTimeout(() => {
             setShowWarn(true);
-            setSecs(120);
-            countRef.current = setInterval(() =>
-                setSecs((s) => s <= 1 ? (clearInterval(countRef.current), 0) : s - 1), 1000);
-        }, TIMEOUT - WARN);
+            runCountdown(setSecs, countRef);
+        }, TIMEOUT_MS - WARN_MS);
 
-        timerRef.current = setTimeout(onLogout, TIMEOUT);
+        timerRef.current = setTimeout(onLogout, TIMEOUT_MS);
     }, [onLogout]);
 
     useEffect(() => {
-        const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+        const events      = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
         const handleEvent = () => reset(false);
-        
-        events.forEach((e) => window.addEventListener(e, handleEvent, { passive: true }));
-        reset(true); // Pass true to avoid setting state synchronously during mount
-        
-        // Safely capture refs for the cleanup phase
-        const currentTimer = timerRef.current;
-        const currentWarn = warnRef.current;
-        const currentCount = countRef.current;
-        
+
+        // FIX: globalThis instead of window
+        events.forEach((e) => globalThis.addEventListener(e, handleEvent, { passive: true }));
+        reset(true);
+
         return () => {
-            events.forEach((e) => window.removeEventListener(e, handleEvent));
-            clearTimeout(currentTimer);
-            clearTimeout(currentWarn);
-            clearInterval(currentCount);
+            events.forEach((e) => globalThis.removeEventListener(e, handleEvent));
+            clearTimeout(timerRef.current);
+            clearTimeout(warnRef.current);
+            clearInterval(countRef.current);
         };
     }, [reset]);
 
-    return { showWarn, secs, reset: () => reset(false) };
+    return { showWarn, secs, stay: () => reset(false) };
 };
 
-// ── Move NavItem outside to prevent re-renders ─────────────────────────────
+// FIX: NavItem outside parent, uses <button> for accessibility, PropTypes added
 const NavItem = ({ icon, label, path }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const active = location.pathname === path;
+    const active   = location.pathname === path;
     return (
-        <div onClick={() => navigate(path)}
-            className={`flex items-center gap-4 p-4 rounded-2xl transition cursor-pointer font-medium ${
-                active ? 'bg-white text-red-700 shadow-lg' : 'hover:bg-white/10 text-red-100/70 hover:text-white'
-            }`}>
+        <button
+            type="button"
+            onClick={() => navigate(path)}
+            className={`w-full flex items-center gap-4 p-4 rounded-2xl transition font-medium text-left ${
+                active
+                    ? 'bg-white text-red-700 shadow-lg'
+                    : 'hover:bg-white/10 text-red-100/70 hover:text-white'
+            }`}
+        >
             {icon} <span>{label}</span>
-        </div>
+        </button>
     );
 };
 
-export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
-    const navigate  = useNavigate();
+NavItem.propTypes = {
+    icon:  PropTypes.node.isRequired,
+    label: PropTypes.string.isRequired,
+    path:  PropTypes.string.isRequired
+};
+
+export const EmployeeLayout = ({ children, title }) => {
+    const navigate = useNavigate();
     const [now, setNow] = useState(new Date());
 
-    // ── Lazy State Initialization ──────────────────────────────────────────
-    const [employee, setEmployee] = useState(() => {
-        return JSON.parse(localStorage.getItem('employee')) || null;
-    });
+    // FIX: read employee directly without setEmployee (was flagged as unused setter)
+    const employee = JSON.parse(localStorage.getItem('employee'));
 
     useEffect(() => {
         const tick = setInterval(() => setNow(new Date()), 1000);
@@ -89,14 +107,11 @@ export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
         navigate('/employee/login');
     }, [navigate]);
 
-    const { showWarn, secs, reset: stayIn } = useEmployeeInactivity(handleLogout);
+    const { showWarn, secs, stay } = useEmployeeInactivity(handleLogout);
 
-    // ── Redirect handling simplified ───────────────────────────────────────
     useEffect(() => {
         const token = localStorage.getItem('empToken');
-        if (!employee || !token) { 
-            navigate('/employee/login'); 
-        }
+        if (!employee || !token) navigate('/employee/login');
     }, [employee, navigate]);
 
     if (!employee) return null;
@@ -104,7 +119,7 @@ export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
     return (
         <div className="flex h-screen bg-gray-100 font-sans">
 
-            {/* Inactivity Warning */}
+            {/* Inactivity warning */}
             {showWarn && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
@@ -117,11 +132,11 @@ export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
                             {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}
                         </p>
                         <div className="flex gap-3">
-                            <button onClick={handleLogout}
+                            <button type="button" onClick={handleLogout}
                                 className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 text-sm hover:bg-gray-50 transition">
                                 Sign Out
                             </button>
-                            <button onClick={stayIn}
+                            <button type="button" onClick={stay}
                                 className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition">
                                 Stay Logged In
                             </button>
@@ -137,10 +152,9 @@ export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
                     <p className="text-red-300 text-xs tracking-[0.25em] uppercase mt-0.5">Staff Portal</p>
                 </div>
 
-                {/* Employee chip */}
                 <div className="flex items-center gap-3 mb-8 bg-white/10 p-3 rounded-2xl">
                     <div className="w-10 h-10 bg-red-200 text-red-800 rounded-full flex items-center justify-center font-bold text-lg shadow">
-                        {employee.fullName?.charAt(0) || 'E'}
+                        {employee.fullName?.charAt(0) ?? 'E'}
                     </div>
                     <div className="min-w-0">
                         <p className="font-bold text-sm truncate">{employee.fullName}</p>
@@ -150,11 +164,10 @@ export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
 
                 <div className="text-[10px] uppercase font-bold tracking-widest text-red-400/60 mb-2 ml-2">Navigation</div>
                 <nav className="space-y-1 flex-grow">
-                    <NavItem icon={<LayoutDashboard size={20} />} label="Dashboard"    path="/employee/dashboard" />
+                    <NavItem icon={<LayoutDashboard size={20} />} label="Dashboard"      path="/employee/dashboard" />
                     <NavItem icon={<ClipboardCheck size={20} />}  label="Verify Payments" path="/employee/payments" />
                 </nav>
 
-                {/* Live clock */}
                 <div className="mb-4 bg-white/5 rounded-2xl p-3">
                     <div className="flex items-center gap-2 text-red-200 text-[11px] mb-1">
                         <Clock size={12} /> Session Active
@@ -167,7 +180,7 @@ export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
                     </p>
                 </div>
 
-                <button onClick={handleLogout}
+                <button type="button" onClick={handleLogout}
                     className="flex items-center gap-3 p-4 rounded-2xl border border-white/20 hover:bg-red-500/30 transition font-bold text-sm">
                     <LogOut size={20} className="text-red-300" /> Sign Out
                 </button>
@@ -192,10 +205,15 @@ export const EmployeeLayout = ({ children, title = 'Employee Dashboard' }) => {
                     </div>
                 </header>
 
-                <main className="flex-grow p-6 lg:p-10 overflow-y-auto">
-                    {children}
-                </main>
+                <main className="flex-grow p-6 lg:p-10 overflow-y-auto">{children}</main>
             </div>
         </div>
     );
 };
+
+// FIX: PropTypes for children and title
+EmployeeLayout.propTypes = {
+    children: PropTypes.node.isRequired,
+    title:    PropTypes.string
+};
+EmployeeLayout.defaultProps = { title: 'Employee Dashboard' };
