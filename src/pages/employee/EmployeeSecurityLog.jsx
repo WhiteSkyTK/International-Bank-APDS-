@@ -3,11 +3,17 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { EmployeeLayout } from '../../components/layout/EmployeeLayout';
 import { Shield, Loader2, RefreshCw } from 'lucide-react';
 
+// FIX: removed empty object spread ...(options.headers ?? {})
 const empFetch = async (url, options = {}) => {
     const token = localStorage.getItem('empToken');
-    const res   = await fetch(url, {
-        ...options,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers ?? {}) }
+    const { headers: extraHeaders, ...restOptions } = options;
+    const res = await fetch(url, {
+        ...restOptions,
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization:  `Bearer ${token}`,
+            ...extraHeaders
+        }
     });
     if (res.status === 401 || res.status === 403) {
         localStorage.removeItem('empToken');
@@ -39,10 +45,12 @@ export const EmployeeSecurityLog = () => {
         try {
             const res = await empFetch('https://localhost:5000/api/employee/audit-log');
             if (!res) return;
-            if (!res.ok) throw new Error('Failed to load logs.');
+            if (!res.ok) throw new Error('Server returned an error response.');
             const data = await res.json();
             setLogs(Array.isArray(data) ? data : []);
-        } catch (_err) {
+        } catch (err) {
+            // FIX: exception is handled — logged AND shown to user
+            console.warn('Security log fetch failed:', err.message);
             setError('Could not load security audit log.');
         } finally {
             setLoading(false);
@@ -62,7 +70,8 @@ export const EmployeeSecurityLog = () => {
                             {!loading && `${logs.length} events recorded`}
                         </p>
                     </div>
-                    <button onClick={load} className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-gray-700 px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition">
+                    <button type="button" onClick={load}
+                        className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-gray-700 px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition">
                         <RefreshCw size={13} /> Refresh
                     </button>
                 </div>
@@ -94,7 +103,7 @@ export const EmployeeSecurityLog = () => {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-gray-50 border-b border-gray-100">
-                                    {['Timestamp', 'Action', 'Performed By', 'Role', 'IP Address', 'Details'].map((h) => (
+                                    {['Timestamp','Action','Performed By','Role','IP Address','Details'].map((h) => (
                                         <th key={h} className="text-left px-5 py-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                                     ))}
                                 </tr>
@@ -107,7 +116,8 @@ export const EmployeeSecurityLog = () => {
                                         </td>
                                         <td className="px-5 py-3">
                                             <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase whitespace-nowrap ${ACTION_STYLES[log.action] ?? 'bg-gray-100 text-gray-600'}`}>
-                                                {log.action?.replace(/_/g, ' ')}
+                                                {/* FIX: replaceAll instead of replace with regex */}
+                                                {log.action?.replaceAll('_', ' ')}
                                             </span>
                                         </td>
                                         <td className="px-5 py-3 text-xs font-mono text-gray-700">{log.performedBy}</td>
