@@ -1,39 +1,40 @@
 // src/utils/secureFetch.js
-// FIX: validate URL before use (SonarQube: tainted URL path)
-const ALLOWED_BASE = 'https://localhost:5000';
+const ALLOWED_ORIGIN = 'https://localhost:5000';
 
+// Validates origin AND that the path contains only safe characters,
+// preventing tainted localStorage data (e.g. user.id) from being used
+// as a path-injection vector. MongoDB IDs (24 hex chars) pass fine.
 const isSafeUrl = (url) => {
     try {
         const parsed = new URL(url);
-        return parsed.origin === ALLOWED_BASE;
+        if (parsed.origin !== ALLOWED_ORIGIN) return false;
+        // Allow only alphanumeric, hyphens, underscores, forward slashes
+        return /^[a-zA-Z0-9/_-]+$/.test(parsed.pathname);
     } catch {
         return false;
     }
 };
 
 export const secureFetch = async (url, options = {}) => {
-    // FIX: validate URL is from our trusted origin only
     if (!isSafeUrl(url)) {
-        throw new Error('Blocked: URL is not from a trusted origin.');
+        throw new Error('Blocked: URL failed safe-origin/path validation.');
     }
 
     const token = localStorage.getItem('token');
-    const headers = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-        // FIX: removed useless empty object spread ...(options.headers || {})
-    };
+    const { headers: extraHeaders, ...restOptions } = options;
 
-    if (options.headers) {
-        Object.assign(headers, options.headers);
-    }
-
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, {
+        ...restOptions,
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...extraHeaders,
+        },
+    });
 
     if (response.status === 401 || response.status === 403) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        // FIX: globalThis instead of window
         globalThis.location.href = '/login?reason=session_expired';
         return null;
     }

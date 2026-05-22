@@ -1,84 +1,33 @@
-// src/components/layout/EmployeeLayout.jsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate, useLocation } from 'react-router-dom';
-// FIX: removed unused Bell and X imports
-import { LayoutDashboard, ClipboardCheck, LogOut, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Bell, CreditCard, Send, History, User, MessageSquare, ShieldCheck, LogOut } from 'lucide-react';
 
-const TIMEOUT_MS = 8 * 60 * 60 * 1000;  // 8 hours
-const WARN_MS    = 2 * 60 * 1000;        // warn 2 min before
-
-// FIX: extracted countdown to module level — reduces nesting depth below 4
-const runCountdown = (setSecs, intervalRef) => {
-    setSecs(120);
-    intervalRef.current = setInterval(() => {
-        setSecs((s) => {
-            if (s <= 1) {
-                clearInterval(intervalRef.current);
-                return 0;
-            }
-            return s - 1;
-        });
-    }, 1000);
-};
-
-const useEmployeeInactivity = (onLogout) => {
-    const timerRef = useRef(null);
-    const warnRef  = useRef(null);
-    const countRef = useRef(null);
-    const [showWarn, setShowWarn] = useState(false);
-    const [secs,     setSecs]     = useState(120);
-
-    const reset = useCallback((isInitial = false) => {
-        if (isInitial !== true) setShowWarn(false);
-        clearTimeout(timerRef.current);
-        clearTimeout(warnRef.current);
-        clearInterval(countRef.current);
-
-        // FIX: countdown logic extracted — nesting depth is now within limit
-        warnRef.current = setTimeout(() => {
-            setShowWarn(true);
-            runCountdown(setSecs, countRef);
-        }, TIMEOUT_MS - WARN_MS);
-
-        timerRef.current = setTimeout(onLogout, TIMEOUT_MS);
-    }, [onLogout]);
-
-    useEffect(() => {
-        const events      = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
-        const handleEvent = () => reset(false);
-
-        // FIX: globalThis instead of window
-        events.forEach((e) => globalThis.addEventListener(e, handleEvent, { passive: true }));
-        reset(true);
-
-        return () => {
-            events.forEach((e) => globalThis.removeEventListener(e, handleEvent));
-            clearTimeout(timerRef.current);
-            clearTimeout(warnRef.current);
-            clearInterval(countRef.current);
-        };
-    }, [reset]);
-
-    return { showWarn, secs, stay: () => reset(false) };
-};
-
-// FIX: NavItem outside parent, uses <button> for accessibility, PropTypes added
-const NavItem = ({ icon, label, path }) => {
+// FIX: NavItem moved outside parent component (avoids re-creation on every render)
+// FIX: uses <button> for accessibility + keyboard support
+// FIX: PropTypes added
+const NavItem = ({ icon, label, path, count }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const active   = location.pathname === path;
+    const active = location.pathname === path;
+
     return (
         <button
             type="button"
             onClick={() => navigate(path)}
             className={`w-full flex items-center gap-4 p-4 rounded-2xl transition font-medium text-left ${
                 active
-                    ? 'bg-white text-red-700 shadow-lg'
-                    : 'hover:bg-white/10 text-red-100/70 hover:text-white'
+                    ? 'bg-white text-[#1C4382] shadow-lg'
+                    : 'hover:bg-white/5 text-blue-100/70 hover:text-white'
             }`}
         >
-            {icon} <span>{label}</span>
+            {icon}
+            <span>{label}</span>
+            {count && (
+                <span className="ml-auto bg-[#4A80D4] text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                    {count}
+                </span>
+            )}
         </button>
     );
 };
@@ -86,134 +35,96 @@ const NavItem = ({ icon, label, path }) => {
 NavItem.propTypes = {
     icon:  PropTypes.node.isRequired,
     label: PropTypes.string.isRequired,
-    path:  PropTypes.string.isRequired
+    path:  PropTypes.string.isRequired,
+    count: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
+NavItem.defaultProps = { count: null };
 
-export const EmployeeLayout = ({ children, title }) => {
+export const DashboardLayout = ({ children, title }) => {
     const navigate = useNavigate();
-    const [now, setNow] = useState(new Date());
 
-    // FIX: read employee directly without setEmployee (was flagged as unused setter)
-    const employee = JSON.parse(localStorage.getItem('employee'));
-
-    useEffect(() => {
-        const tick = setInterval(() => setNow(new Date()), 1000);
-        return () => clearInterval(tick);
-    }, []);
-
-    const handleLogout = useCallback(() => {
-        localStorage.removeItem('empToken');
-        localStorage.removeItem('employee');
-        navigate('/employee/login');
-    }, [navigate]);
-
-    const { showWarn, secs, stay } = useEmployeeInactivity(handleLogout);
+    // FIX: removed useState/setUser (setter was never called — SonarQube unused-setter)
+    // Read directly from localStorage; auth redirect handled in useEffect below
+    const user = JSON.parse(localStorage.getItem('user')) || null;
 
     useEffect(() => {
-        const token = localStorage.getItem('empToken');
-        if (!employee || !token) navigate('/employee/login');
-    }, [employee, navigate]);
+        if (!user) navigate('/login');
+    }, [user, navigate]);
 
-    if (!employee) return null;
+    const handleLogout = () => {
+        localStorage.removeItem('user');
+        navigate('/login');
+    };
+
+    if (!user) return null;
 
     return (
-        <div className="flex h-screen bg-gray-100 font-sans">
-
-            {/* Inactivity warning */}
-            {showWarn && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl">
-                        <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <AlertTriangle size={32} className="text-orange-500" />
-                        </div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">Session Expiring</h2>
-                        <p className="text-gray-500 text-sm mb-2">You'll be signed out in:</p>
-                        <p className="text-5xl font-bold text-red-600 mb-6 tabular-nums">
-                            {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}
-                        </p>
-                        <div className="flex gap-3">
-                            <button type="button" onClick={handleLogout}
-                                className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 text-sm hover:bg-gray-50 transition">
-                                Sign Out
-                            </button>
-                            <button type="button" onClick={stay}
-                                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-sm hover:bg-red-700 transition">
-                                Stay Logged In
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+        <div className="flex h-screen bg-[#E5E7EB] font-sans">
             {/* Sidebar */}
-            <div className="w-64 lg:w-72 bg-[#7B1A1A] text-white flex flex-col p-4 lg:p-6 shadow-xl hidden md:flex shrink-0">
-                <div className="mb-8">
-                    <h1 className="text-2xl font-bold tracking-tighter">GLOBALPAY</h1>
-                    <p className="text-red-300 text-xs tracking-[0.25em] uppercase mt-0.5">Staff Portal</p>
+            <div className="w-64 lg:w-72 bg-[#1C4382] text-white flex flex-col p-4 lg:p-6 shadow-xl z-20 hidden md:flex shrink-0">
+                <h1 className="text-2xl font-bold mb-8 tracking-tighter">GLOBALPAY</h1>
+
+                <div className="flex items-center gap-4 mb-8 bg-white/10 p-3 rounded-2xl">
+                    <div className="w-10 h-10 bg-white text-[#1C4382] rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
+                        {user.fullName.charAt(0)}
+                    </div>
+                    <div>
+                        <p className="font-bold text-sm leading-none mb-1">{user.fullName}</p>
+                        <p className="text-[10px] text-blue-200 opacity-70 uppercase tracking-wider">
+                            Acc: {user.accountNumber?.slice(-4) || '8818'}
+                        </p>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-3 mb-8 bg-white/10 p-3 rounded-2xl">
-                    <div className="w-10 h-10 bg-red-200 text-red-800 rounded-full flex items-center justify-center font-bold text-lg shadow">
-                        {employee.fullName?.charAt(0) ?? 'E'}
-                    </div>
-                    <div className="min-w-0">
-                        <p className="font-bold text-sm truncate">{employee.fullName}</p>
-                        <p className="text-[10px] text-red-300 uppercase tracking-wider">{employee.employeeId}</p>
-                    </div>
-                </div>
-
-                <div className="text-[10px] uppercase font-bold tracking-widest text-red-400/60 mb-2 ml-2">Navigation</div>
-                <nav className="space-y-1 flex-grow">
-                    <NavItem icon={<LayoutDashboard size={20} />} label="Dashboard"      path="/employee/dashboard" />
-                    <NavItem icon={<ClipboardCheck size={20} />}  label="Verify Payments" path="/employee/payments" />
+                <div className="text-[10px] uppercase font-bold tracking-widest text-blue-300/50 mb-2 ml-2">Main</div>
+                <nav className="space-y-1 mb-6">
+                    <NavItem icon={<CreditCard size={20} />} label="Overview"      path="/dashboard" />
+                    <NavItem icon={<Send size={20} />}       label="Make Payment"  path="/payment" />
+                    <NavItem icon={<History size={20} />}    label="Transactions"  path="/transactions" count="3" />
                 </nav>
 
-                <div className="mb-4 bg-white/5 rounded-2xl p-3">
-                    <div className="flex items-center gap-2 text-red-200 text-[11px] mb-1">
-                        <Clock size={12} /> Session Active
-                    </div>
-                    <p className="text-white font-mono text-sm font-bold">
-                        {now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </p>
-                    <p className="text-red-300 text-[10px] mt-0.5">
-                        {now.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    </p>
-                </div>
+                <div className="text-[10px] uppercase font-bold tracking-widest text-blue-300/50 mb-2 ml-2">Account</div>
+                <nav className="space-y-1 flex-grow">
+                    <NavItem icon={<User size={20} />}         label="My Profile" path="/profile" />
+                    <NavItem icon={<MessageSquare size={20} />} label="Support"    path="/support" />
+                    <NavItem icon={<ShieldCheck size={20} />}  label="Security"   path="/security" />
+                </nav>
 
-                <button type="button" onClick={handleLogout}
-                    className="flex items-center gap-3 p-4 rounded-2xl border border-white/20 hover:bg-red-500/30 transition font-bold text-sm">
-                    <LogOut size={20} className="text-red-300" /> Sign Out
+                <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="mt-auto flex items-center gap-3 p-4 rounded-2xl border border-white/20 hover:bg-red-500/20 hover:border-red-500/30 transition font-bold text-sm"
+                >
+                    <LogOut size={20} className="text-red-400" /> Sign Out
                 </button>
             </div>
 
-            {/* Main */}
-            <div className="flex-grow flex flex-col overflow-hidden">
-                <header className="bg-white px-6 py-4 shadow-sm flex justify-between items-center shrink-0">
+            {/* Main Content Area */}
+            <div className="flex-grow flex flex-col overflow-hidden relative">
+                <header className="bg-white p-6 shadow-sm flex justify-between items-center z-10 shrink-0">
                     <h2 className="text-xl lg:text-2xl font-bold text-gray-800">{title}</h2>
-                    <div className="flex items-center gap-3">
-                        <div className="hidden sm:flex flex-col items-end">
-                            <p className="text-xs font-bold text-gray-600">
-                                {now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </p>
-                            <p className="text-[10px] text-gray-400 font-mono">
-                                {now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </p>
+                    <div className="flex items-center gap-4 lg:gap-6">
+                        <div className="relative cursor-pointer hover:scale-110 transition">
+                            <Bell className="text-gray-400" />
+                            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
                         </div>
-                        <div className="bg-red-100 text-red-700 px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center gap-1.5">
-                            <ShieldCheck size={12} /> {employee.employeeId}
-                        </div>
+                        <p className="text-sm font-medium text-gray-500 hidden sm:block">
+                            {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
                     </div>
                 </header>
 
-                <main className="flex-grow p-6 lg:p-10 overflow-y-auto">{children}</main>
+                <main className="flex-grow p-6 lg:p-10 overflow-y-auto">
+                    {children}
+                </main>
             </div>
         </div>
     );
 };
 
-// FIX: PropTypes for children and title
-EmployeeLayout.propTypes = {
+// FIX: PropTypes for DashboardLayout
+DashboardLayout.propTypes = {
     children: PropTypes.node.isRequired,
-    title:    PropTypes.string
+    title:    PropTypes.string,
 };
-EmployeeLayout.defaultProps = { title: 'Employee Dashboard' };
+DashboardLayout.defaultProps = { title: 'Dashboard Overview' };
