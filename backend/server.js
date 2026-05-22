@@ -125,6 +125,16 @@ const employeeOnly = (req, res, next) => {
     next();
 };
 
+// ── 5b. OWNERSHIP MIDDLEWARE ──────────────────────────────────────────────────
+// FIX: extracted repeated userId ownership check — eliminates duplicated lines
+// at L273-284 and L288-299 (SonarQube duplication rule)
+const ownsResource = (req, res, next) => {
+    if (req.user.id.toString() !== req.params.userId) {
+        return res.status(403).json({ error: 'Unauthorised.' });
+    }
+    next();
+};
+
 // ── 6. DB ─────────────────────────────────────────────────────────────────────
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('✅ MongoDB Atlas connected'))
@@ -254,8 +264,8 @@ app.post('/api/pay', authenticate, async (req, res) => {
     }
 });
 
-app.get('/api/transactions/:userId', authenticate, async (req, res) => {
-    if (req.user.id.toString() !== req.params.userId) return res.status(403).json({ error: 'Unauthorised.' });
+// Transactions — was: if (req.user.id.toString() !== req.params.userId) ...
+app.get('/api/transactions/:userId', authenticate, ownsResource, async (req, res) => {
     try {
         const history = await Payment.find({ userId: String(req.params.userId) }).sort({ createdAt: -1 });
         res.json(history);
@@ -336,8 +346,8 @@ app.get('/api/employee/audit-log', authenticate, employeeOnly, async (req, res) 
 });
 
 // ── 14. NOTIFICATION ROUTES ───────────────────────────────────────────────────
-app.get('/api/notifications/:userId', authenticate, async (req, res) => {
-    if (req.user.id.toString() !== req.params.userId) return res.status(403).json({ error: 'Unauthorised.' });
+// Notifications GET — ownership check now handled by middleware
+app.get('/api/notifications/:userId', authenticate, ownsResource, async (req, res) => {
     try {
         const notifs = await Notification.find({ userId: String(req.params.userId) }).sort({ createdAt: -1 }).limit(20);
         res.json(notifs);
@@ -347,8 +357,8 @@ app.get('/api/notifications/:userId', authenticate, async (req, res) => {
     }
 });
 
-app.patch('/api/notifications/:userId/read-all', authenticate, async (req, res) => {
-    if (req.user.id.toString() !== req.params.userId) return res.status(403).json({ error: 'Unauthorised.' });
+// Notifications PATCH — ownership check now handled by middleware
+app.patch('/api/notifications/:userId/read-all', authenticate, ownsResource, async (req, res) => {
     try {
         await Notification.updateMany({ userId: String(req.params.userId) }, { read: true });
         res.json({ message: 'All read.' });
