@@ -1,4 +1,3 @@
-// src/pages/dashboard/Overview.jsx
 import React, { useEffect, useState } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { useNavigate } from 'react-router-dom';
@@ -6,35 +5,46 @@ import { Download, Loader2, ArrowUpRight, TrendingUp } from 'lucide-react';
 import { secureFetch } from '../../utils/secureFetch';
 import { CURRENCIES } from '../../utils/swiftCodes';
 
-// FIX: no zero fraction
-const EXCHANGE_RATES = { ZAR: 1, USD: 0.054, EUR: 0.050, GBP: 0.043, JPY: 8.12, AUD: 0.083, CAD: 0.074, CHF: 0.048, CNY: 0.39 };
+// FIX: removed trailing zero from EUR (0.050 → 0.05) — SonarQube "no zero fraction"
+const EXCHANGE_RATES = {
+    ZAR: 1, USD: 0.054, EUR: 0.05, GBP: 0.043,
+    JPY: 8.12, AUD: 0.083, CAD: 0.074, CHF: 0.048, CNY: 0.39,
+};
 
 const statusStyle = (s) => {
-    // FIX: no nested ternary — use explicit if/else
-    if (s === 'Verified')  return 'bg-green-100 text-green-700';
-    if (s === 'Rejected')  return 'bg-red-100 text-red-600';
+    if (s === 'Verified') return 'bg-green-100 text-green-700';
+    if (s === 'Rejected') return 'bg-red-100 text-red-600';
     return 'bg-orange-100 text-orange-600';
 };
+
+// FIX: validates MongoDB ObjectId format before it touches any URL,
+// sanitizing the tainted localStorage value at the source.
+const toSafeId = (id) => (/^[a-f\d]{24}$/i.test(id) ? id : null);
 
 export const Overview = () => {
     const navigate = useNavigate();
     const user = JSON.parse(localStorage.getItem('user')) ?? {};
-    const [recentTx, setRecentTx]       = useState([]);
-    const [txLoading, setTxLoading]     = useState(true);
-    const [txError,   setTxError]       = useState('');
+    const [recentTx,    setRecentTx]    = useState([]);
+    const [txLoading,   setTxLoading]   = useState(true);
+    const [txError,     setTxError]     = useState('');
     const [selectedCcy, setSelectedCcy] = useState('USD');
 
     useEffect(() => {
-        if (!user.id) return;
+        // FIX: sanitize user.id before URL construction
+        const safeId = toSafeId(user.id);
+        if (!safeId) return;
+
         const load = async () => {
             setTxLoading(true);
             try {
-                const res = await secureFetch(`https://localhost:5000/api/transactions/${user.id}`);
+                const res = await secureFetch(`https://localhost:5000/api/transactions/${safeId}`);
                 if (!res) return;
                 if (!res.ok) throw new Error('Failed to load transactions.');
                 const data = await res.json();
                 setRecentTx(data.slice(0, 3));
-            } catch (_err) {
+            } catch (err) {
+                // FIX: exception is used — logged and shown to user
+                console.warn('Transaction fetch failed:', err.message);
                 setTxError('Could not load recent transactions.');
             } finally {
                 setTxLoading(false);
@@ -44,19 +54,23 @@ export const Overview = () => {
     }, [user.id]);
 
     const downloadStatement = async () => {
+        // FIX: sanitize user.id at source before URL use
+        const safeId = toSafeId(user.id);
+        if (!safeId) { alert('Invalid session. Please log in again.'); return; }
+
         try {
-            const res = await secureFetch(`https://localhost:5000/api/transactions/${user.id}`);
+            const res = await secureFetch(`https://localhost:5000/api/transactions/${safeId}`);
             if (!res) return;
             const data = await res.json();
             if (!data.length) { alert('No transactions to export yet.'); return; }
 
             const headers = ['Date', 'Payee Name', 'Payee Account', 'SWIFT Code', 'Currency', 'Amount (Debit)', 'Status'];
-            const rows    = data.map((tx) => [
+            const rows = data.map((tx) => [
                 new Date(tx.createdAt).toLocaleString('en-ZA'),
                 tx.payeeName, tx.payeeAccount, tx.swiftCode,
                 tx.currency ?? 'ZAR',
                 `-${tx.amount.toFixed(2)}`,
-                tx.status
+                tx.status,
             ]);
             const csv  = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -66,10 +80,11 @@ export const Overview = () => {
             a.download = `GlobalPay_Statement_${user.accountNumber}_${new Date().toISOString().slice(0, 10)}.csv`;
             document.body.appendChild(a);
             a.click();
-            // FIX: childNode.remove() instead of parentNode.removeChild()
             a.remove();
             URL.revokeObjectURL(url);
-        } catch (_err) {
+        } catch (err) {
+            // FIX: exception logged and shown — not silently swallowed
+            console.warn('Statement download failed:', err.message);
             alert('Could not generate statement.');
         }
     };

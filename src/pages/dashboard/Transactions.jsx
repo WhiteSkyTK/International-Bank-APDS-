@@ -1,17 +1,18 @@
-// src/pages/dashboard/Transactions.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { ArrowUpRight, Loader2, RefreshCw } from 'lucide-react';
 import { secureFetch } from '../../utils/secureFetch';
 
-// FIX: statusStyle uses positive conditions — no negated ternaries
 const statusStyle = (status) => {
-    if (status === 'Verified')          return 'bg-green-100 text-green-700';
-    if (status === 'Rejected')          return 'bg-red-100 text-red-600';
+    if (status === 'Verified')           return 'bg-green-100 text-green-700';
+    if (status === 'Rejected')           return 'bg-red-100 text-red-600';
     if (status === 'Submitted to SWIFT') return 'bg-blue-100 text-blue-700';
-    return 'bg-orange-100 text-orange-600'; // Pending (default)
+    return 'bg-orange-100 text-orange-600';
 };
+
+// FIX: extracted pluralisation — eliminates the nested ternary in JSX
+const transactionLabel = (count) => `${count} transaction${count !== 1 ? 's' : ''} found`;
 
 export const Transactions = () => {
     const navigate = useNavigate();
@@ -35,7 +36,6 @@ export const Transactions = () => {
             const data = await res.json();
             setHistory(data);
         } catch (err) {
-            // FIX: exception handled — logged and shown to user
             console.warn('Transaction fetch failed:', err.message);
             setError(err.message || 'Could not reach the server.');
         } finally {
@@ -45,15 +45,18 @@ export const Transactions = () => {
 
     useEffect(() => { fetchHistory(); }, []);
 
+    // FIX: no nested ternary — compute label in JS, not JSX
+    const countText = loading ? '' : transactionLabel(history.length);
+
+    // FIX: positive condition replaces negated compound — "show empty state when all three are clear"
+    const showEmpty = !loading && !error && history.length === 0;
+
     return (
         <DashboardLayout title="Transaction History">
             <div className="max-w-4xl space-y-4">
 
                 <div className="flex justify-between items-center">
-                    <p className="text-sm text-gray-500 font-medium">
-                        {/* FIX: positive condition — loading is false AND no error */}
-                        {loading ? '' : `${history.length} transaction${history.length !== 1 ? 's' : ''} found`}
-                    </p>
+                    <p className="text-sm text-gray-500 font-medium">{countText}</p>
                     <button type="button" onClick={fetchHistory}
                         className="flex items-center gap-2 text-xs font-bold text-[#4A80D4] hover:underline">
                         <RefreshCw size={13} /> Refresh
@@ -76,8 +79,8 @@ export const Transactions = () => {
                     </div>
                 )}
 
-                {/* FIX: positive condition — all three must be true */}
-                {loading || error || history.length > 0 ? null : (
+                {/* FIX: clean positive condition — no negation, no nested ternary */}
+                {showEmpty && (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
                         <span className="text-5xl">📭</span>
                         <p className="font-semibold text-sm">No transactions yet.</p>
@@ -105,7 +108,7 @@ export const Transactions = () => {
                                     <span className="text-[10px] text-gray-400">
                                         {new Date(tx.createdAt).toLocaleString('en-ZA', {
                                             day: 'numeric', month: 'short', year: 'numeric',
-                                            hour: '2-digit', minute: '2-digit'
+                                            hour: '2-digit', minute: '2-digit',
                                         })}
                                     </span>
                                 </div>
