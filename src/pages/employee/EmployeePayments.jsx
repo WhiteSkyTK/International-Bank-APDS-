@@ -1,37 +1,17 @@
-// src/pages/employee/EmployeePayments.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import { EmployeeLayout } from '../../components/layout/EmployeeLayout';
 import { CheckCircle, XCircle, Send, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { empFetch } from '../../utils/empFetch';
 
-// FIX: removed empty object spread, globalThis instead of window
-const empFetch = async (url, options = {}) => {
-    const token = localStorage.getItem('empToken');
-    const { headers: extraHeaders, ...restOptions } = options;
-    const res = await fetch(url, {
-        ...restOptions,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization:  `Bearer ${token}`,
-            ...extraHeaders
-        }
-    });
-    if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem('empToken');
-        localStorage.removeItem('employee');
-        globalThis.location.href = '/employee/login?reason=session_expired';
-        return null;
-    }
-    return res;
-};
+// ↑ local empFetch block DELETED — imported from shared utility above
 
 const SWIFT_REGEX = /^[A-Z0-9]{8,11}$/;
 
-// FIX: status style as function — avoids negated conditions in JSX
 const statusStyle = (s) => {
-    if (s === 'Verified')          return 'bg-green-100 text-green-700';
-    if (s === 'Rejected')          return 'bg-red-100 text-red-600';
+    if (s === 'Verified')           return 'bg-green-100 text-green-700';
+    if (s === 'Rejected')           return 'bg-red-100 text-red-600';
     if (s === 'Submitted to SWIFT') return 'bg-blue-100 text-blue-700';
-    return 'bg-orange-100 text-orange-700'; // Pending
+    return 'bg-orange-100 text-orange-700';
 };
 
 export const EmployeePayments = () => {
@@ -70,7 +50,6 @@ export const EmployeePayments = () => {
     };
 
     const handleReject = async (id) => {
-        // FIX: globalThis.confirm instead of window.confirm
         if (!globalThis.confirm('Reject this payment? The customer will be refunded.')) return;
         setActionLoading((prev) => ({ ...prev, [id]: 'rejecting' }));
         const res = await empFetch(`https://localhost:5000/api/employee/payments/${id}/reject`, { method: 'PATCH' });
@@ -83,7 +62,6 @@ export const EmployeePayments = () => {
     const handleSubmitSwift = async () => {
         const verifiedCount = payments.filter((p) => p.status === 'Verified').length;
         if (verifiedCount === 0) { setSubmitMsg('No verified payments to submit.'); return; }
-        // FIX: globalThis.confirm
         if (!globalThis.confirm(`Submit ${verifiedCount} verified payment(s) to SWIFT? This cannot be undone.`)) return;
         setSubmitting(true);
         setSubmitMsg('');
@@ -105,7 +83,6 @@ export const EmployeePayments = () => {
         <EmployeeLayout title="Verify International Payments">
             <div className="space-y-6 max-w-7xl">
 
-                {/* Action bar */}
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex gap-4 text-sm">
                         <span className="bg-orange-100 text-orange-700 font-bold px-3 py-1.5 rounded-full">{pendingCount} Pending</span>
@@ -170,7 +147,6 @@ export const EmployeePayments = () => {
                                     const isPending  = p.status === 'Pending';
                                     const isDone     = p.status === 'Submitted to SWIFT';
 
-                                    // FIX: positive condition — swiftValid ? '' : 'bg-red-50/30'
                                     return (
                                         <tr key={p._id} className={`hover:bg-gray-50/50 transition ${swiftValid ? '' : 'bg-red-50/30'}`}>
                                             <td className="px-5 py-4">
@@ -183,7 +159,6 @@ export const EmployeePayments = () => {
                                                 <span className={`font-mono font-bold text-xs px-2 py-1 rounded-lg ${swiftValid ? 'bg-blue-50 text-blue-700' : 'bg-red-100 text-red-700'}`}>
                                                     {p.swiftCode}
                                                 </span>
-                                                {/* FIX: positive condition — swiftValid is false → show warning */}
                                                 {swiftValid ? null : (
                                                     <p className="text-[9px] text-red-500 mt-0.5">⚠ Invalid format</p>
                                                 )}

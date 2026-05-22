@@ -1,28 +1,9 @@
-// src/pages/employee/EmployeeSecurityLog.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import { EmployeeLayout } from '../../components/layout/EmployeeLayout';
 import { Shield, Loader2, RefreshCw } from 'lucide-react';
+import { empFetch } from '../../utils/empFetch';
 
-// FIX: removed empty object spread ...(options.headers ?? {})
-const empFetch = async (url, options = {}) => {
-    const token = localStorage.getItem('empToken');
-    const { headers: extraHeaders, ...restOptions } = options;
-    const res = await fetch(url, {
-        ...restOptions,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization:  `Bearer ${token}`,
-            ...extraHeaders
-        }
-    });
-    if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem('empToken');
-        localStorage.removeItem('employee');
-        globalThis.location.href = '/employee/login?reason=session_expired';
-        return null;
-    }
-    return res;
-};
+// ↑ local empFetch block DELETED — imported from shared utility above
 
 const ACTION_STYLES = {
     CUSTOMER_LOGIN:    'bg-blue-100 text-blue-700',
@@ -49,7 +30,6 @@ export const EmployeeSecurityLog = () => {
             const data = await res.json();
             setLogs(Array.isArray(data) ? data : []);
         } catch (err) {
-            // FIX: exception is handled — logged AND shown to user
             console.warn('Security log fetch failed:', err.message);
             setError('Could not load security audit log.');
         } finally {
@@ -116,7 +96,6 @@ export const EmployeeSecurityLog = () => {
                                         </td>
                                         <td className="px-5 py-3">
                                             <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase whitespace-nowrap ${ACTION_STYLES[log.action] ?? 'bg-gray-100 text-gray-600'}`}>
-                                                {/* FIX: replaceAll instead of replace with regex */}
                                                 {log.action?.replaceAll('_', ' ')}
                                             </span>
                                         </td>

@@ -1,33 +1,11 @@
-// src/pages/employee/EmployeeDashboard.jsx
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { EmployeeLayout } from '../../components/layout/EmployeeLayout';
 import { ClipboardCheck, Clock, CheckCircle, XCircle, Loader2, Send } from 'lucide-react';
+// FIX: import shared utility — removes 19 duplicated lines
+import { empFetch } from '../../utils/empFetch';
 
-// FIX: removed empty object spread ...(options.headers || {}) — useless per SonarQube
-// FIX: globalThis instead of window
-const empFetch = async (url, options = {}) => {
-    const token = localStorage.getItem('empToken');
-    const { headers: extraHeaders, ...restOptions } = options;
-    const res = await fetch(url, {
-        ...restOptions,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization:  `Bearer ${token}`,
-            ...extraHeaders
-        }
-    });
-    if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem('empToken');
-        localStorage.removeItem('employee');
-        globalThis.location.href = '/employee/login?reason=session_expired';
-        return null;
-    }
-    return res;
-};
-
-// FIX: StatusBadge moved outside parent, PropTypes added
 const STATUS_STYLES = {
     'Pending':            'bg-orange-100 text-orange-700',
     'Verified':           'bg-green-100 text-green-700',
@@ -40,10 +18,7 @@ const StatusBadge = ({ status }) => (
         {status}
     </span>
 );
-
-StatusBadge.propTypes = {
-    status: PropTypes.string.isRequired
-};
+StatusBadge.propTypes = { status: PropTypes.string.isRequired };
 
 export const EmployeeDashboard = () => {
     const navigate = useNavigate();
@@ -76,21 +51,16 @@ export const EmployeeDashboard = () => {
     return (
         <EmployeeLayout title="Employee Dashboard">
             <div className="space-y-6 max-w-5xl">
-
-                {/* Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     {stats.map((s) => (
                         <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                            <div className={`w-11 h-11 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>
-                                {s.icon}
-                            </div>
+                            <div className={`w-11 h-11 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>{s.icon}</div>
                             <p className="text-2xl font-bold text-gray-800">{loading ? '—' : s.value}</p>
                             <p className="text-xs text-gray-400 font-medium mt-0.5">{s.label}</p>
                         </div>
                     ))}
                 </div>
 
-                {/* Pending banner */}
                 {!loading && pending > 0 && (
                     <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -99,37 +69,29 @@ export const EmployeeDashboard = () => {
                                 <p className="font-bold text-orange-800 text-sm">
                                     {pending} transaction{pending > 1 ? 's' : ''} awaiting verification
                                 </p>
-                                <p className="text-orange-600 text-xs mt-0.5">
-                                    Review payee details and verify the SWIFT code before approving.
-                                </p>
+                                <p className="text-orange-600 text-xs mt-0.5">Review payee details and verify the SWIFT code before approving.</p>
                             </div>
                         </div>
-                        <button type="button"
-                            onClick={() => navigate('/employee/payments')}
+                        <button type="button" onClick={() => navigate('/employee/payments')}
                             className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shrink-0">
                             Review Now →
                         </button>
                     </div>
                 )}
 
-                {/* Recent transactions */}
                 <div>
                     <h3 className="font-bold text-gray-800 mb-4">Recent Transactions</h3>
-
                     {loading && (
                         <div className="flex items-center justify-center py-16 gap-3 text-gray-400">
-                            <Loader2 size={20} className="animate-spin" />
-                            <span className="text-sm">Loading…</span>
+                            <Loader2 size={20} className="animate-spin" /><span className="text-sm">Loading…</span>
                         </div>
                     )}
-
                     {!loading && payments.length === 0 && (
                         <div className="bg-white rounded-3xl p-10 text-center text-gray-400 border border-gray-100">
                             <ClipboardCheck size={32} className="mx-auto mb-3 opacity-30" />
                             <p className="text-sm font-medium">No transactions in the system yet.</p>
                         </div>
                     )}
-
                     <div className="space-y-3">
                         {!loading && payments.slice(0, 5).map((p) => (
                             <div key={p._id} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
@@ -139,9 +101,7 @@ export const EmployeeDashboard = () => {
                                     </div>
                                     <div>
                                         <p className="font-bold text-gray-800 text-sm">{p.userId?.fullName ?? 'Customer'}</p>
-                                        <p className="text-xs text-gray-400">
-                                            → {p.payeeName} · <span className="font-mono">{p.swiftCode}</span>
-                                        </p>
+                                        <p className="text-xs text-gray-400">→ {p.payeeName} · <span className="font-mono">{p.swiftCode}</span></p>
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -153,10 +113,8 @@ export const EmployeeDashboard = () => {
                             </div>
                         ))}
                     </div>
-
                     {!loading && payments.length > 5 && (
-                        <button type="button"
-                            onClick={() => navigate('/employee/payments')}
+                        <button type="button" onClick={() => navigate('/employee/payments')}
                             className="mt-4 w-full text-center text-xs font-bold text-red-600 hover:underline">
                             View all {payments.length} transactions →
                         </button>

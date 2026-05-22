@@ -11,8 +11,8 @@ const statusStyle = (status) => {
     return 'bg-orange-100 text-orange-600';
 };
 
-// FIX: extracted pluralisation — eliminates the nested ternary in JSX
-const transactionLabel = (count) => `${count} transaction${count !== 1 ? 's' : ''} found`;
+// FIX: positive condition (count === 1) — eliminates the negated !== at L15
+const transactionLabel = (count) => `${count} transaction${count === 1 ? '' : 's'} found`;
 
 export const Transactions = () => {
     const navigate = useNavigate();
@@ -45,16 +45,12 @@ export const Transactions = () => {
 
     useEffect(() => { fetchHistory(); }, []);
 
-    // FIX: no nested ternary — compute label in JS, not JSX
     const countText = loading ? '' : transactionLabel(history.length);
-
-    // FIX: positive condition replaces negated compound — "show empty state when all three are clear"
     const showEmpty = !loading && !error && history.length === 0;
 
     return (
         <DashboardLayout title="Transaction History">
             <div className="max-w-4xl space-y-4">
-
                 <div className="flex justify-between items-center">
                     <p className="text-sm text-gray-500 font-medium">{countText}</p>
                     <button type="button" onClick={fetchHistory}
@@ -73,13 +69,10 @@ export const Transactions = () => {
                 {error && !loading && (
                     <div className="bg-red-50 border border-red-200 text-red-600 text-sm font-semibold p-5 rounded-2xl">
                         <p>{error}</p>
-                        <button type="button" onClick={fetchHistory} className="mt-2 text-xs underline">
-                            Try again
-                        </button>
+                        <button type="button" onClick={fetchHistory} className="mt-2 text-xs underline">Try again</button>
                     </div>
                 )}
 
-                {/* FIX: clean positive condition — no negation, no nested ternary */}
                 {showEmpty && (
                     <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
                         <span className="text-5xl">📭</span>
@@ -102,14 +95,9 @@ export const Transactions = () => {
                                 <p className="font-bold text-gray-800">{tx.payeeName}</p>
                                 <p className="text-xs text-gray-500 font-mono">To: {tx.payeeAccount}</p>
                                 <div className="flex items-center gap-2 flex-wrap mt-1">
-                                    <span className="bg-blue-50 text-[#4A80D4] text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">
-                                        {tx.swiftCode}
-                                    </span>
+                                    <span className="bg-blue-50 text-[#4A80D4] text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">{tx.swiftCode}</span>
                                     <span className="text-[10px] text-gray-400">
-                                        {new Date(tx.createdAt).toLocaleString('en-ZA', {
-                                            day: 'numeric', month: 'short', year: 'numeric',
-                                            hour: '2-digit', minute: '2-digit',
-                                        })}
+                                        {new Date(tx.createdAt).toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                 </div>
                             </div>
