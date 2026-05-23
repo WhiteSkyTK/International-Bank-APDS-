@@ -256,7 +256,7 @@ Covers: security headers · input whitelisting (SQLi/XSS rejection) · bcrypt ha
 | Task | Video |
 |---|---|
 | Task 2 — Customer Portal | [▶ Watch on YouTube](https://youtu.be/-smfDPmT8pk) |
-| Task 3 — Employee Portal | *(add link after recording)* |
+| Task 3 — Employee Portal | [▶ Watch on YouTube](https://youtu.be/sP3yxSgYzXQ) |
 
 ---
 
